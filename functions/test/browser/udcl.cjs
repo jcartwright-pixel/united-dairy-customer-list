@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Joe 11/1: the United Dairy Customer List. Customers (by customer, route and day; a customer's card), Route Sequence (move a stop,
- * change a load number), Truck Load Map (paint a spot) and the Load Map Kiosk, each with its Print menu. Made-up customers only.
+ * change a load number), Truck Load Map (paint a spot, type a load sequence, move a line), Administration and the Load Map Kiosk, each with its Print menu. Made-up customers only.
  * Pictures at 1920, 1366 and 390 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -97,6 +97,8 @@ const shot = async (p, name) => { if (!SHOTS) return; await p.waitForTimeout(300
     await s.press('#rows input.seq[data-i="2"]', 'Tab');
     for (let i = 0; i < 50 && (await ref.get()).data().stops[2].loadSeq !== 9; i++) await new Promise(r => setTimeout(r, 100));
     assert.equal((await ref.get()).data().stops[2].loadSeq, 9);
+    for (let i = 0; i < 50 && U.cleanMap((await ref.get()).data().map).cells.flat().includes(6); i++) await new Promise(r => setTimeout(r, 100));
+    assert.equal(U.cleanMap((await ref.get()).data().map).cells.flat().includes(6), false, 'the truck\'s 6 spots became 9');
     await s.click('#udcl-print-menu > button');
     assert.equal(await s.textContent('#udcl-print-menu .pm-list button[data-i="0"]'), 'Route 805 Thursday for the officeStops in order with load sequence, address and notes');
 
@@ -118,7 +120,36 @@ const shot = async (p, name) => { if (!SHOTS) return; await p.waitForTimeout(300
     assert.equal(await spot(), 9);
     await l.selectOption('#door', '6');
     await l.waitForSelector('.lm-door');
+    // Joe 11/1: the Run Seq and Load Seq columns; type a load sequence (the truck's spots follow), move a line (the run order).
+    assert.match(await l.textContent('.lm-right thead'), /Run Seq\s*Load Seq/);
+    for (let i = 0; i < 50 && U.cleanMap((await ref.get()).data().map).door !== 6; i++) await new Promise(r => setTimeout(r, 100));
+    const had2 = U.cleanMap((await ref.get()).data().map).cells.flat().filter(v => v === 2).length;
+    assert.ok(had2 > 0, 'load 2 has spots on the truck');
+    await l.fill('#rows input.lm-seq[data-i="0"]', '5');
+    await l.press('#rows input.lm-seq[data-i="0"]', 'Tab');
+    for (let i = 0; i < 50 && (await ref.get()).data().stops[0].loadSeq !== 5; i++) await new Promise(r => setTimeout(r, 100));
+    assert.equal((await ref.get()).data().stops[0].loadSeq, 5);
+    const cells = U.cleanMap((await ref.get()).data().map).cells.flat();
+    assert.equal(cells.filter(v => v === 2).length, 0);
+    assert.equal(cells.filter(v => v === 5).length, had2, 'the spots that had load 2 now have 5');
+    await l.focus('#rows tr[data-drag="13590"]');
+    await l.keyboard.press('Alt+ArrowUp');
+    for (let i = 0; i < 50 && (await ref.get()).data().stops[1].key !== '13590'; i++) await new Promise(r => setTimeout(r, 100));
+    assert.deepEqual((await ref.get()).data().stops.map(x => x.key), ['1707', '13590', '40121']);
+    await l.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-drag]')].map(r => r.dataset.drag).join() === '1707,13590,40121');
     await shot(l, 'udcl-1920-load-map');
+    // The kiosk is not in the menu; Administration is, for an administrator.
+    const nav = await l.$$eval('#udcl-nav a', a => a.filter(x => x.offsetParent).map(x => x.textContent));
+    assert.deepEqual(nav, ['Home', 'Customers', 'Route Sequence', 'Truck Load Map', 'Administration']);
+    assert.equal(await v.$$eval('#udcl-nav a', a => a.filter(x => x.offsetParent).map(x => x.textContent).includes('Administration')), false, 'a dispatcher has no Administration');
+
+    // Administration: the view-only link to the kiosk.
+    const ad = await page(browser, EMAIL);
+    await ad.goto(ad.emailFor('administration.html'));
+    await ad.waitForSelector('#imported:not(:empty)');
+    assert.match(await ad.textContent('#imported'), /Made Up Route Menu\.xlsb/);
+    assert.equal(await ad.getAttribute('#kiosk-link', 'href'), 'load-map.html?kiosk=1');
+    await shot(ad, 'udcl-1920-administration');
 
     // The kiosk: today's routes as buttons, the truck and its customers, nothing to change.
     const k = await page(browser, EMAIL, { width: 1920, height: 1080 });
@@ -127,6 +158,10 @@ const shot = async (p, name) => { if (!SHOTS) return; await p.waitForTimeout(300
     assert.equal(await k.$$eval('.lm-cell.edit', x => x.length), 0);
     assert.equal(await k.isHidden('#editor'), true);
     assert.match(await k.textContent('#rows'), /CASH N SAVE/);
+    assert.equal(await k.$$eval('#rows input', x => x.length), 0, 'the kiosk has no boxes');
+    assert.equal(await k.$$eval('#rows tr[data-drag]', x => x.length), 0, 'and no lines to drag');
+    assert.equal(await k.isVisible('#go-admin'), true, 'the kiosk has an Administration button');
+    assert.equal(await k.$$eval('#udcl-nav', x => x.length), 0, 'and no menu');
     await shot(k, 'udcl-1920-kiosk');
 
     // A phone width.

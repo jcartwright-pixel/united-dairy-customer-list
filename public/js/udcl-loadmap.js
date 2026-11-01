@@ -5,7 +5,8 @@
 // ?kiosk=1 is the plant's Load Map Kiosk: today's routes as big buttons, nothing to change, and it reads the list again every
 // two minutes so a change made in the office shows on the floor.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
-import { readList, saveStep, printMenu, printDoc, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, seqColour, U } from './udcl.js';
+import { mountRowDrag } from './row-drag.js';
+import { readList, saveStep, printMenu, printDoc, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, seqColour, followLoadSeq, U } from './udcl.js';
 
 const params = new URLSearchParams(location.search);
 const KIOSK = params.get('kiosk') === '1';
@@ -44,7 +45,12 @@ function draw() {
   }
   $('truck').innerHTML = rd ? truckHtml(map, { edit: canEdit() }) : '<p>' + (data.routeDays.length ? 'Pick a route and day.' : 'The customer list is empty. An administrator imports it on the Customers screen.') + '</p>';
   const stops = rd ? rd.stops || [] : [];
-  $('rows').innerHTML = stops.map((s, i) => { const c = data.customers[s.key] || {}; return '<tr><td><span class="stopno">' + (i + 1) + '</span></td><td><span class="sw" style="background:' + seqColour(s.loadSeq) + '">' + (s.loadSeq || '-') + '</span></td><td class="l"><b>' + e(c.name || s.name) + '</b></td><td class="l">' + e([s.note, c.notes].filter(Boolean).join(' · ')) + '</td></tr>'; }).join('') ||
+  // Joe 11/1: "grab it, move it up and down. And that is the run sequence ... and then I would like to be able to edit the load
+  // sequence." An Administrator or Manager drags a line to change the run order and types its load sequence; the kiosk only shows.
+  const ed = canEdit();
+  $('rows').innerHTML = stops.map((s, i) => { const c = data.customers[s.key] || {}; return '<tr' + (ed ? ' data-drag="' + e(s.key) + '" tabindex="0"' : '') + '><td><span class="stopno">' + (i + 1) + '</span></td><td>' +
+      (ed ? '<input class="lm-seq" data-i="' + i + '" inputmode="numeric" value="' + (s.loadSeq || '') + '" style="background:' + seqColour(s.loadSeq) + '" aria-label="Load sequence for ' + e(c.name || s.name) + '">' : '<span class="sw" style="background:' + seqColour(s.loadSeq) + '">' + (s.loadSeq || '-') + '</span>') +
+      '</td><td class="l"><b>' + e(c.name || s.name) + '</b></td><td class="l">' + e([s.note, c.notes].filter(Boolean).join(' · ')) + '</td></tr>'; }).join('') ||
     '<tr><td colspan="4" class="empty">No stops.</td></tr>';
   $('notes').innerHTML = rd && rd.notes ? '<div class="box" style="margin:8px;white-space:pre-wrap"><b>Instructions</b><br>' + e(rd.notes) + '</div>' : '';
   $('editor').hidden = !canEdit() || !rd;
@@ -58,7 +64,7 @@ function draw() {
   }
   const missing = stops.filter(s => !s.loadSeq).length;
   $('hint').textContent = KIOSK ? (rd && rd.updatedAt ? 'Last changed ' + shortDate(rd.updatedAt) + '. ' : '') + 'Load 1 goes on first, at the front of the truck.' :
-    (canEdit() ? 'Pick a load number, then tap or drag across spots to paint it. Every change saves by itself. ' : 'Load 1 goes on first, at the front. ') + (missing ? missing + ' stop' + (missing === 1 ? ' has' : 's have') + ' no load sequence (set it on Route Sequence).' : '');
+    (canEdit() ? 'Drag a customer up or down to change the run sequence; type its load sequence in the box. Pick a load number, then tap or drag across spots to paint the truck. Every change saves by itself. ' : 'Load 1 goes on first, at the front. ') + (missing ? missing + ' stop' + (missing === 1 ? ' has' : 's have') + ' no load sequence ' : '');
 }
 
 /** The map changed on the screen: shown at once, saved a moment after the last tap. */
@@ -87,6 +93,43 @@ function paint(cell) {
   m.cells[r][c] = v;
   changed(m);
 }
+/* ---------- run sequence and load sequence ---------- */
+const stopsNow = () => (current().stops || []).map(x => ({ key: x.key, loadSeq: x.loadSeq, note: x.note || '' }));
+let stopSaving = Promise.resolve();
+/** Saves the stops (new run order or load sequence), with the truck drawing when it changed too. */
+function saveStops(list, map) {
+  const r = route, d = day;
+  stopSaving = stopSaving.then(async () => {
+    if (pending) { clearTimeout(timer); await flush(); }
+    const rd = rdOf(r, d);
+    if (!rd) return;
+    try {
+      const out = await saveStep('saveRouteDay', Object.assign({ route: r, day: d, rev: rd.rev, stops: list }, map ? { map } : {}));
+      const i = data.routeDays.indexOf(rdOf(r, d));
+      if (i >= 0) data.routeDays[i] = out.routeDay;
+      showError('');
+    } catch (err) { showError(serverText(err, 'the customer list')); try { data = Object.assign(data, await readList()); } catch (e2) { /* keep */ } }
+    draw();
+  });
+  return stopSaving;
+}
+function moveStop(from, to) {
+  const list = stopsNow();
+  if (from < 0 || to < 0 || to >= list.length || from === to) return;
+  const [x] = list.splice(from, 1); list.splice(to, 0, x);
+  const rd = current(), shown = rd.stops.slice(), [o] = shown.splice(from, 1); shown.splice(to, 0, o); rd.stops = shown; draw();
+  saveStops(list);
+}
+$('rows').addEventListener('change', ev => {
+  const el = ev.target;
+  if (!el.matches('input.lm-seq') || !canEdit()) return;
+  const list = stopsNow(), i = Number(el.dataset.i), was = list[i].loadSeq, now = U.seqOf(el.value);
+  if (was === now) return;
+  list[i].loadSeq = now;
+  saveStops(list, followLoadSeq(mapNow(), list, i, was, now));
+});
+mountRowDrag({ box: $('rows'), canDrag: () => !!canEdit(), onMove: (key, to) => moveStop((current().stops || []).findIndex(x => x.key === key), to) });
+
 const leave = async (fn) => { if (pending) { clearTimeout(timer); await flush(); } fn(); };
 
 $('truck').addEventListener('pointerdown', ev => { const cell = ev.target.closest('.lm-cell.edit'); if (!cell) return; painting = true; paint(cell); ev.preventDefault(); });
@@ -121,5 +164,7 @@ async function read() {
 }
 requireSignIn(async () => {
   await read();
+  // Route Sequence, this screen and the drivers' Route Book share one copy: coming back to this tab shows changes made there.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !pending) read(); });
   if (KIOSK) setInterval(() => { if (KIOSK && day !== todayKey() && !params.get('day')) day = todayKey(); read(); }, 120000);
 });

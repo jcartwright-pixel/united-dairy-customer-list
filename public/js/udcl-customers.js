@@ -53,7 +53,7 @@ function draw() {
   } else {
     const lines = U.pick(allLines, fl);
     const grp = (l) => view === 'route' && (!$('sort').value || $('sort').value === 'route') ? 'Route ' + l.route + ' · ' + dayName(l.day) : view === 'day' && (!$('sort').value || $('sort').value === 'day') ? dayName(l.day) + ' · Route ' + l.route : '';
-    $('thead').innerHTML = '<tr><th style="width:8%">Day</th><th style="width:7%">Route</th><th style="width:6%">Stop</th><th style="width:6%">Load</th><th style="width:9%">Account</th><th class="l" style="width:24%">Customer</th><th class="l" style="width:16%">City</th><th class="l">Stop note</th></tr>';
+    $('thead').innerHTML = '<tr><th style="width:8%">Day</th><th style="width:7%">Route</th><th style="width:7%">Run Seq</th><th style="width:7%">Load Seq</th><th style="width:9%">Account</th><th class="l" style="width:24%">Customer</th><th class="l" style="width:16%">City</th><th class="l">Stop note</th></tr>';
     let last = null;
     $('rows').innerHTML = lines.map(l => {
       const g = grp(l), head = g && g !== last ? '<tr class="group"><td colspan="8" class="l">' + e(g) + ' &nbsp; <a href="route-sequence.html?route=' + encodeURIComponent(l.route) + '&day=' + l.day + '">Open in Route Sequence &rarr;</a></td></tr>' : '';
@@ -118,12 +118,12 @@ function sheetRows(X, wb, name) { const ws = wb.Sheets[name]; return ws ? X.util
 function findSheet(wb, want) { return wb.SheetNames.find(n => n.trim().toLowerCase() === want.toLowerCase()); }
 
 function openImport() {
-  panel('Import the customer list', '<p>Pick the <b>Route Menu</b> workbook (it decides every customer, route, day and load sequence). Pick the <b>Route Book</b> too if you have it: it only fills in start times, run order, keys and instructions that are still blank, where they still fit.</p>' +
+  panel('Import the customer list', '<p>Pick the <b>Route Menu</b> workbook (it decides every customer, route, day and load sequence). Pick the <b>Route Book</b> too if you have it: its run order, start times, keys, instructions and truck drawings replace what is here.</p>' +
     '<label>Route Menu workbook (.xlsb, .xlsx)<input type="file" id="i-menu" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<button type="button" class="primary" id="i-go">Read and import</button><div id="i-msg"></div><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button>' +
-    '<p class="deliveries">An import keeps what was typed here: run order, start times, instructions, load maps, addresses, phones, keys and notes. A route day no longer in the Route Menu is removed.</p>');
+    '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
   $('i-go').onclick = async () => {
     const mf = $('i-menu').files[0], bf = $('i-book').files[0];
@@ -158,7 +158,7 @@ function openImport() {
 function printItems() {
   if (!data) return [];
   const fl = f(), pn = data.plantName, filt = [fl.route && 'route ' + fl.route, fl.day && dayName(fl.day), fl.chain && 'chain ' + fl.chain, fl.q && '"' + fl.q + '"'].filter(Boolean).join(', ');
-  const lineCols = [['Day', l => dayName(l.day).slice(0, 3), 1], ['Route', l => l.route, 1], ['Stop', l => l.stop, 1], ['Load', l => l.loadSeq || '', 1], ['Account', l => l.account], ['Customer', l => l.name], ['Address', l => U.addressLine(l)], ['Note', l => l.note]];
+  const lineCols = [['Day', l => dayName(l.day).slice(0, 3), 1], ['Route', l => l.route, 1], ['Run Seq', l => l.stop, 1], ['Load Seq', l => l.loadSeq || '', 1], ['Account', l => l.account], ['Customer', l => l.name], ['Address', l => U.addressLine(l)], ['Note', l => l.note]];
   const rds = sortedRouteDays(data.routeDays).filter(rd => (!fl.route || rd.route === fl.route) && (!fl.day || rd.day === fl.day));
   return [
     { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'customer'

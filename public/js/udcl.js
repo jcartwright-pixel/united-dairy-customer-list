@@ -11,6 +11,8 @@ const U = window.UDCL;
 export async function readList() {
   const d = await callServer('customerList', { op: 'view' });
   showPlant(d.plantName);
+  // Administration (in the menu, and the kiosk's one button) shows only to administrators; the server checks again.
+  document.body.classList.toggle('is-admin', !!d.canImport);
   // Someone set up for more than one plant picks the plant in the header; the list is that plant's.
   const bar = document.querySelector('#screen > .topbar');
   if (bar && (d.plants || []).length > 1 && !document.getElementById('plant-pick')) {
@@ -40,6 +42,18 @@ export function truckHtml(map, opts) {
   });
   if (m.door === m.rows) h += '<div class="lm-door">SIDE DOOR</div>';
   return h + '<div class="lm-label">Back door</div></div>';
+}
+
+/**
+ * A stop's load sequence changed from was to now: the truck follows. When no other stop still has the old number, every spot that
+ * carried it gets the new one. Returns the new map, or null when the truck has nothing to change.
+ */
+export function followLoadSeq(map, list, i, was, now) {
+  if (!was || !now || list.some((x, j) => j !== i && x.loadSeq === was)) return null;
+  const m = U.cleanMap(map);
+  if (!m.cells.some(row => row.includes(was))) return null;
+  m.cells = m.cells.map(row => row.map(v => (v === was ? now : v)));
+  return m;
 }
 
 /* ---------- the Print menu ---------- */
@@ -119,7 +133,7 @@ export function routeDayPage(rd, customers, kind, plantName) {
       '<td>' + e(c.account || s.account || '') + '</td><td><b>' + e(c.name || s.name || '') + '</b>' + (c.chain ? ' <small>(' + e(c.chain) + ')</small>' : '') + '</td>' +
       '<td>' + e(U.addressLine(c)) + '</td>' + (driver ? '<td>' + e(c.keys || '') + '</td><td></td><td></td>' : '') + '<td>' + e(note) + '</td></tr>';
   }).join('');
-  const head = '<tr><th class="c">Stop</th><th class="c">Load</th><th>Account</th><th>Customer</th><th>Address</th>' + (driver ? '<th>Keys / door code</th><th>Time in</th><th>Time out</th>' : '') + '<th>Notes</th></tr>';
+  const head = '<tr><th class="c">Run Seq</th><th class="c">Load Seq</th><th>Account</th><th>Customer</th><th>Address</th>' + (driver ? '<th>Keys / door code</th><th>Time in</th><th>Time out</th>' : '') + '<th>Notes</th></tr>';
   const title = 'Route ' + e(rd.route) + ' · ' + e(U.DAY_NAMES[rd.day] || rd.day) + (rd.startTime ? ' · Start ' + e(rd.startTime) : '');
   const table = '<table>' + head + rows + '</table>';
   const notes = rd.notes ? '<div class="notes"><b>Instructions</b>\n' + e(rd.notes) + '</div>' : '';
@@ -132,7 +146,7 @@ export function routeDayPage(rd, customers, kind, plantName) {
 export function loadMapPage(rd, customers, plantName) {
   const rows = (rd.stops || []).map((s, i) => { const c = customers[s.key] || {}; return '<tr><td class="c">' + (i + 1) + '</td><td class="c"><span class="sw" style="background:' + seqColour(s.loadSeq) + '">' + (s.loadSeq || '') + '</span></td><td><b>' + e(c.name || s.name) + '</b></td><td>' + e(s.note || '') + '</td></tr>'; }).join('');
   return '<h1>Truck load map · Route ' + e(rd.route) + ' · ' + e(U.DAY_NAMES[rd.day] || rd.day) + '</h1><p class="sub">' + e(plantName || '') + ' · Load 1 goes on first, at the front · ' + changed(rd) + '</p>' +
-    '<div class="two" style="grid-template-columns:auto 1fr"><div>' + truckHtml(rd.map) + '</div><div><table><tr><th class="c">Stop</th><th class="c">Load</th><th>Customer</th><th>Notes</th></tr>' + rows + '</table>' +
+    '<div class="two" style="grid-template-columns:auto 1fr"><div>' + truckHtml(rd.map) + '</div><div><table><tr><th class="c">Run Seq</th><th class="c">Load Seq</th><th>Customer</th><th>Notes</th></tr>' + rows + '</table>' +
     (rd.notes ? '<div class="notes"><b>Instructions</b>\n' + e(rd.notes) + '</div>' : '') + '</div></div><p class="foot">' + printedOn() + '</p>';
 }
 

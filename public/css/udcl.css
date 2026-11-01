@@ -104,3 +104,11 @@ body.udcl-kiosk .lm-right td { font-size: 20px; }
 .udcl-help .tip { background: var(--band, #eef3f8); border-left: 4px solid var(--ud-blue); padding: 8px 12px; border-radius: 6px; }
 .udcl-help .dont { background: var(--error-bg); color: var(--error-ink); border-left: 4px solid currentColor; padding: 8px 12px; border-radius: 6px; }
 @media print { .udcl-nav { display: none; } }
+/* Joe 11/1: the load sequence typed right on the Truck Load Map's customer list. */
+input.lm-seq { width: 4.2em; text-align: center; font: inherit; font-weight: 800; border: 1px solid var(--line); border-radius: 6px; padding: 4px 2px; }
+#rows tr[data-drag] { cursor: grab; }
+
+/* Administration shows only to administrators (Joe 11/1). */
+body:not(.is-admin) .admin-only { display: none !important; }
+.topbar .brand:has(+ #go-admin) { margin-right: 0; }
+.topbar #go-admin { margin: 0 auto 0 16px; }

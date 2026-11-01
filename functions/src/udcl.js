@@ -133,10 +133,12 @@ async function saveCustomer(db, plant, email, input, stamp) {
  * The Route Menu workbook, read on the screen (Customer By Route, Address List, GPS Address; and the Route Book if it was picked
  * too). input: { stops, unrouted, addresses: {account: {...}}, gps: {nameKey: {...}}, book: {'803|TUE': {...}}, fileName }.
  *
- * The Route Menu decides who is on which route day and each stop's load sequence. What was typed in the app is kept: a route
- * day's run order (customers new to it are slotted in by load sequence), start time, instructions and load map; a customer's
- * address, phone, keys and notes. The Route Book and the address tabs fill only what is still blank. A route day no longer in the
- * Route Menu is removed; a customer no longer on any line is kept but marked not active.
+ * Joe 11/1: "anything that is uploaded ... overrules everything if I do a new upload only." Changes made in the app stay until
+ * the next upload; nothing else puts them back. At an upload, whatever the files have wins: the Route Menu decides who is on
+ * which route day and each stop's load sequence; the Route Book (if picked) the run order, start time, instructions, keys and
+ * truck drawing (where its numbers still match); the address tabs the addresses. What the files do not have stays as typed here
+ * (phones, contacts, notes, stop notes, and the run order and load map when no Route Book was picked). A route day no longer in
+ * the Route Menu is removed; a customer no longer on any line is kept but marked not active.
  */
 async function importMenu(db, plant, email, input, stamp) {
   const stops = (Array.isArray(input.stops) ? input.stops : []).slice(0, U.MAX_LINES);
@@ -160,7 +162,8 @@ async function importMenu(db, plant, email, input, stamp) {
     const after = Object.assign({ plant, key, account: x.account, name: x.name, chain: x.chain, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null }, before || {});
     after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true;
     if (!after.dc) after.dc = U.PLANT_DC[plant] || '';
-    const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && (after[k] === '' || after[k] === null || after[k] === undefined)) { after[k] = v; return 1; } return 0; };
+    // What the upload has replaces what is here (counted when it changes something).
+    const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && after[k] !== v) { after[k] = v; return 1; } return 0; };
     const got = U.cleanCustomer({ address: a.address || g.address, address2: a.address2, city: a.city || g.city, state: a.state || g.state, zip: a.zip, keys: keysFrom[key], lat: g.lat, lon: g.lon });
     let n = 0;
     Object.keys(got).forEach(k => { n += fill(k, got[k]); });
@@ -189,9 +192,11 @@ async function importMenu(db, plant, email, input, stamp) {
     const notes = (b && b.instructions || []).join('\n');
     const after = Object.assign({ plant, route, day, stops: [], startTime: '', notes: '', map: null, rev: 0 }, before || {});
     after.stops = ordered.map(x => { const old = before && (before.stops || []).find(s => s.key === x.key); return { key: x.key, account: x.account, name: x.name, chain: x.chain, loadSeq: x.loadSeq, note: old ? old.note || '' : '' }; });
-    if (!after.startTime && b && b.startTime) after.startTime = U.text(b.startTime, U.LIMITS.startTime);
-    if (!after.notes && notes) after.notes = notes.slice(0, U.LIMITS.notes);
-    after.map = U.packMap(after.map || U.bookMap(b, after.stops) || U.autoMap(after.stops));
+    if (b && b.startTime) after.startTime = U.text(b.startTime, U.LIMITS.startTime);
+    if (notes) after.notes = notes.slice(0, U.LIMITS.notes);
+    // The Route Book's drawing when it fits; else the one here while every number on it is still a load sequence; else a new one.
+    const kept = after.map && U.mapFits(after.map, after.stops) ? U.cleanMap(after.map) : null;
+    after.map = U.packMap(U.bookMap(b, after.stops) || kept || U.autoMap(after.stops));
     if (!before) newDays++;
     if (!before && b) bookUsed++;
     after.rev = (before ? before.rev || 0 : 0) + 1;

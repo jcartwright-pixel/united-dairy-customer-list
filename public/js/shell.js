@@ -12,13 +12,14 @@ const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const HERE = location.pathname.split('/').pop() || 'index.html';
 const QS = new URLSearchParams(location.search);
 
-// The screens, in the menu's order. The kiosk opens full screen on the plant floor.
+// The screens, in the menu's order. Joe 11/1: the Load Map Kiosk is not in the menu; it is a view-only link on Administration
+// (administrators only), and the kiosk itself has just an Administration button.
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'The Customer List screens' },
   { href: 'customers.html', name: 'Customers', note: 'Every customer by customer, route or day; sort, filter, print' },
   { href: 'route-sequence.html', name: 'Route Sequence', note: 'Change a route day\'s run order and print it for the office' },
   { href: 'load-map.html', name: 'Truck Load Map', note: 'How the truck is loaded, the customers beside it' },
-  { href: 'load-map.html?kiosk=1', name: 'Load Map Kiosk', note: 'For the plant floor: today\'s routes, nothing to change' },
+  { href: 'administration.html', name: 'Administration', note: 'Administrators only: the Load Map Kiosk view and the last import', admin: true },
   { href: 'help.html', name: 'Help', note: 'How each screen works' }
 ];
 
@@ -103,12 +104,17 @@ function drawFrame() {
     const help = document.createElement('a');
     help.href = 'help.html#' + (document.body.dataset.help || 'home'); help.textContent = '? Help'; help.className = 'help-link';
     bar.insertBefore(help, document.getElementById('who'));
+    if (document.body.classList.contains('udcl-kiosk')) {
+      const admin = document.createElement('a');
+      admin.href = 'administration.html'; admin.className = 'button admin-only'; admin.id = 'go-admin'; admin.textContent = 'Administration';
+      brand.after(admin);
+    }
   }
   const screen = document.getElementById('screen');
   if (screen && !document.getElementById('udcl-nav') && document.body.dataset.nav !== 'none' && !document.body.classList.contains('udcl-kiosk')) {
     const nav = document.createElement('nav');
     nav.id = 'udcl-nav'; nav.className = 'udcl-nav'; nav.setAttribute('aria-label', 'Customer List screens');
-    nav.innerHTML = SCREENS.filter(s => s.href !== 'help.html').map(s => '<a href="' + s.href + '"' + (s.href === hereHref() ? ' aria-current="page"' : '') + '>' + escapeHtml(s.name) + '</a>').join('');
+    nav.innerHTML = SCREENS.filter(s => s.href !== 'help.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + (s.href === hereHref() ? ' aria-current="page"' : '') + '>' + escapeHtml(s.name) + '</a>').join('');
     bar.insertAdjacentElement('afterend', nav);
   }
 }

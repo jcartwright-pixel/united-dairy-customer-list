@@ -4,7 +4,7 @@
 // driver's route book page, or every day of the route / every route of the day.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
 import { mountRowDrag } from './row-drag.js';
-import { readList, saveStep, printMenu, printDoc, routeDayPage, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, U } from './udcl.js';
+import { readList, saveStep, printMenu, printDoc, routeDayPage, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, followLoadSeq, U } from './udcl.js';
 
 const params = new URLSearchParams(location.search);
 let data = null, route = params.get('route') || '', day = U.dayOf(params.get('day')) || '';
@@ -99,8 +99,12 @@ $('rows').addEventListener('change', ev => {
   const el = ev.target, i = Number(el.dataset.i);
   if (!el.matches('input.seq, input.note')) return;
   const list = stopsNow();
-  if (el.matches('.seq')) list[i].loadSeq = U.seqOf(el.value); else list[i].note = el.value;
-  save({ stops: list });
+  if (el.matches('.note')) { list[i].note = el.value; return save({ stops: list }); }
+  // The truck load map follows the new load sequence (the same as on Truck Load Map).
+  const was = list[i].loadSeq, rd = current();
+  list[i].loadSeq = U.seqOf(el.value);
+  const map = followLoadSeq(rd.map || U.autoMap(rd.stops || []), list, i, was, list[i].loadSeq);
+  save(Object.assign({ stops: list }, map ? { map } : {}));
 });
 $('add-pick').onchange = () => { const k = $('add-pick').value; if (!k) return; const list = stopsNow(); list.push({ key: k, loadSeq: 0, note: '' }); save({ stops: list }); };
 $('start').onchange = () => save({ startTime: $('start').value });

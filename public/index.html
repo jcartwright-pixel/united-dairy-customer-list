@@ -29,7 +29,7 @@
   </div>
   <script type="module">import { requireSignIn, SCREENS, escapeHtml as e, showError, serverText, shortDate } from './js/shell.js';
 import { readList } from './js/udcl.js';
-document.getElementById('tiles').innerHTML = SCREENS.filter(s => s.href !== 'index.html').map(s => '<a href="' + s.href + '"><strong>' + e(s.name) + '</strong>' + e(s.note) + '</a>').join('');
+document.getElementById('tiles').innerHTML = SCREENS.filter(s => s.href !== 'index.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + '><strong>' + e(s.name) + '</strong>' + e(s.note) + '</a>').join('');
 requireSignIn(async () => {
   try {
     const d = await readList();

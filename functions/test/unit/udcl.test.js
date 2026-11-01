@@ -139,7 +139,7 @@ async function imported() {
   return { db, out };
 }
 
-test('an import makes the customers and route days; the Route Book fills only what is blank', async () => {
+test('an import makes the customers and route days, with the Route Book\'s start time, keys and instructions', async () => {
   const { db, out } = await imported();
   assert.equal(out.counts.customers, 5);
   assert.equal(out.counts.routeDays, 3);
@@ -188,6 +188,25 @@ test('only an Administrator or Manager changes the order, the rev stops two peop
   assert.equal(after.startTime, '3:30 AM');
   // A dispatcher may not import.
   await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importMenu', stops: m.stops }), /Only an administrator/);
+});
+
+test('Joe 11/1: a new upload overrules what was changed here; what the files do not have stays as typed', async () => {
+  const { db } = await imported();
+  const tue = () => S.udclCall(db, mgr, PLANT, { op: 'view' }).then(v => v.routeDays.find(r => r.route === '900' && r.day === 'TUE'));
+  const before = await tue();
+  const order = before.stops.map(s => ({ key: s.key, loadSeq: s.loadSeq, note: s.key === '5001' ? 'Side door' : '' })).reverse();
+  await S.udclCall(db, mgr, PLANT, { op: 'saveRouteDay', route: '900', day: 'TUE', rev: before.rev, stops: order, startTime: '3:30 AM' }, now);
+  await S.udclCall(db, mgr, PLANT, { op: 'saveCustomer', key: '5001', fields: { address: '9 TYPED RD', phone: '555-0101' } }, now);
+  const m = U.menuStops(MENU);
+  const book = { '900|TUE': { startTime: '5:00 AM', instructions: ['New gate code'], stops: [{ account: '5002', name: 'BEST FOODS #2', run: 1 }, { account: '5001', name: 'ACME MARKET', run: 2 }, { account: '5003', name: 'CORNER STORE *COD*', run: 3 }], grid: [] } };
+  await S.udclCall(db, boss, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted, addresses: { 5001: { address: '1 MAIN ST', city: 'TOWN', state: 'PA', zip: '15401' } }, gps: {}, book }, now);
+  const after = await tue(), v = await S.udclCall(db, mgr, PLANT, { op: 'view' });
+  assert.deepEqual(after.stops.map(s => s.key), ['5002', '5001', '5003'], 'the Route Book\'s run order wins');
+  assert.equal(after.startTime, '5:00 AM');
+  assert.equal(after.notes, 'New gate code');
+  assert.equal(v.customers['5001'].address, '1 MAIN ST', 'the uploaded address wins');
+  assert.equal(v.customers['5001'].phone, '555-0101', 'a phone the files do not have stays');
+  assert.equal(after.stops.find(s => s.key === '5001').note, 'Side door', 'a stop note stays');
 });
 
 test('a route day off the Route Menu is removed and its customer no longer active; customers are added and changed', async () => {

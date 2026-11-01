@@ -179,12 +179,23 @@
   /* ---------- run order and load maps ---------- */
 
   /**
-   * The stops of one route day in run order. The first time (no saved order): the Route Book's run order where the customer is
-   * still on that route day there; else the load sequence from the back door in (the highest number comes off first), then the
-   * name. A saved order is kept; customers new to the route day go after the stop with the next higher load sequence.
+   * The stops of one route day in run order, at an import. The Route Book's run order wins where it covers most of the stops.
+   * Else a saved order is kept (customers new to the route day go after the stop with the next higher load sequence); else the
+   * load sequence from the back door in (the highest number comes off first), then the name.
    */
   function runOrder(stops, saved, book) {
-    var list = stops.slice();
+    // Joe 11/1: a new upload overrules everything. The Route Book's run numbers decide when it has them for most of the stops;
+    // without them the order saved here stays (the Route Menu carries no run order); customers new to it are slotted in by load
+    // sequence. Nothing saved and no Route Book: by load sequence, highest first.
+    var list = stops.slice(), run = {};
+    ((book && book.stops) || []).forEach(function (b) { if (b.run) run[custKey(b.account, b.name)] = b.run; });
+    var hasRun = list.filter(function (s) { return run[s.key]; }).length;
+    if (hasRun && hasRun * 2 >= list.length) {
+      return list.sort(function (a, b) {
+        var ra = run[a.key] || 999, rb = run[b.key] || 999;
+        return ra - rb || b.loadSeq - a.loadSeq || a.name.localeCompare(b.name);
+      });
+    }
     if (saved && saved.length) {
       var at = {};
       saved.forEach(function (k, i) { at[k] = i; });
@@ -196,16 +207,7 @@
       });
       return kept;
     }
-    var run = {};
-    ((book && book.stops) || []).forEach(function (b) { if (b.run) run[custKey(b.account, b.name)] = b.run; });
-    var hasRun = list.filter(function (s) { return run[s.key]; }).length;
-    return list.sort(function (a, b) {
-      if (hasRun * 2 >= list.length) {
-        var ra = run[a.key] || 999, rb = run[b.key] || 999;
-        if (ra !== rb) return ra - rb;
-      }
-      return b.loadSeq - a.loadSeq || a.name.localeCompare(b.name);
-    });
+    return list.sort(function (a, b) { return b.loadSeq - a.loadSeq || a.name.localeCompare(b.name); });
   }
 
   /** The load sequence numbers on a route day, smallest first. */
@@ -244,6 +246,12 @@
     book.grid.forEach(function (r) { r.forEach(function (c) { if (c) used[c] = true; }); });
     if (!Object.keys(used).every(function (k) { return seqs.indexOf(Number(k)) >= 0; })) return null;
     return cleanMap({ rows: book.grid.length, door: book.door, cells: book.grid });
+  }
+
+  /** Whether every number on a saved load map is still one of the route day's load sequence numbers. */
+  function mapFits(map, stops) {
+    var seqs = seqsOf(stops || []), m = cleanMap(map);
+    return m.cells.every(function (r) { return r.every(function (c) { return !c || seqs.indexOf(c) >= 0; }); });
   }
 
   /** A load map as saved: rows 1-30, 6 spots each, each spot a load sequence number or blank; the side door row or none. */
@@ -377,7 +385,7 @@
     return [text(c.address), text(c.address2), cityLine].filter(Boolean).join(', ');
   }
 
-  return { DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
+  return { mapFits: mapFits, DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
     CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
