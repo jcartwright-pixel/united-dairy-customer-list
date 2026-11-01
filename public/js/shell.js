@@ -92,6 +92,22 @@ export function printInFrame(html, opts) {
   return f;
 }
 
+/* ---------- the installed app (Joe 11/1: "want to downloadable app") ---------- */
+if ('serviceWorker' in navigator && !LOCAL) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); installPrompt = ev; document.dispatchEvent(new Event('udcl-installable')); });
+/** Whether this window is already the installed app. */
+export const installed = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+/** Opens the browser's own Install box; false when the browser has none to give (iPhone and iPad: Share, Add to Home Screen). */
+export async function installApp() {
+  if (!installPrompt) return false;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => null);
+  installPrompt = null;
+  return true;
+}
+export const canInstall = () => !!installPrompt;
+
 /* ---------- the header and the menu ---------- */
 const hereHref = () => HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
 function drawFrame() {

@@ -6,6 +6,10 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="UD Customers">
   <title>Customer List</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/udcl.css">
@@ -26,10 +30,26 @@
     <div class="head"><div class="title"><span class="eyebrow">United Dairy Customer List &middot; <span id="plant-name"></span></span><h1>Customer List</h1></div></div>
     <div class="udcl-home" id="tiles"></div>
     <p class="udcl-help" id="imported"></p>
+    <div class="udcl-install" id="install-box" hidden>
+      <b>Get the Customer List app</b>
+      <span id="install-how">It opens in its own window, with its own icon, like the Operations app.</span>
+      <button type="button" class="primary" id="install">Install the app</button>
+    </div>
   </div>
-  <script type="module">import { requireSignIn, SCREENS, escapeHtml as e, showError, serverText, shortDate } from './js/shell.js';
+  <script type="module">import { requireSignIn, SCREENS, escapeHtml as e, showError, serverText, shortDate, installed, installApp, canInstall } from './js/shell.js';
 import { readList } from './js/udcl.js';
 document.getElementById('tiles').innerHTML = SCREENS.filter(s => s.href !== 'index.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + '><strong>' + e(s.name) + '</strong>' + e(s.note) + '</a>').join('');
+// Joe 11/1: "want to downloadable app". Install opens the browser's own box; an iPhone or iPad is told how instead.
+const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function showInstall() {
+  const box = document.getElementById('install-box');
+  if (installed()) { box.hidden = true; return; }
+  if (canInstall()) { box.hidden = false; document.getElementById('install').hidden = false; return; }
+  if (ios) { box.hidden = false; document.getElementById('install').hidden = true; document.getElementById('install-how').textContent = 'On this iPhone or iPad: tap Share, then Add to Home Screen.'; }
+}
+document.addEventListener('udcl-installable', showInstall);
+document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };
+showInstall();
 requireSignIn(async () => {
   try {
     const d = await readList();

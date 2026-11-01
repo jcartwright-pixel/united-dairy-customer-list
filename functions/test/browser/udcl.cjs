@@ -35,6 +35,19 @@ async function page(browser, email, size) {
 }
 const shot = async (p, name) => { if (!SHOTS) return; await p.waitForTimeout(300); await p.screenshot({ path: path.join(SHOTS, name + '.png') }); };
 
+async function ph0(browser) {
+  const ctx = await browser.newContext(), p = await ctx.newPage();
+  const r = await p.request.get(HOSTING + '/manifest.webmanifest');
+  assert.equal(r.status(), 200);
+  const m = await r.json();
+  assert.equal(m.display, 'standalone');
+  for (const i of m.icons) assert.equal((await p.request.get(HOSTING + i.src)).status(), 200, i.src);
+  assert.equal((await p.request.get(HOSTING + '/sw.js')).status(), 200);
+  for (const f of fs.readdirSync(path.join(__dirname, '../../../public')).filter(x => x.endsWith('.html'))) assert.match(fs.readFileSync(path.join(__dirname, '../../../public', f), 'utf8'), /rel="manifest" href="manifest\.webmanifest"/, f);
+  await ctx.close();
+  return m;
+}
+
 (async () => {
   await clear();
   await db().collection('users').doc(EMAIL).set({ name: 'Test Admin', status: 'ACTIVE', roles: ['ADMIN'], facilities: ['*'], cells: { id: 'usr_cla', version: '1' } });
@@ -164,6 +177,8 @@ const shot = async (p, name) => { if (!SHOTS) return; await p.waitForTimeout(300
     assert.equal(await k.$$eval('#udcl-nav', x => x.length), 0, 'and no menu');
     await shot(k, 'udcl-1920-kiosk');
 
+    // Joe 11/1: "want to downloadable app": every page names the app's manifest, and its icons are there.
+    await ph0(browser);
     // A phone width.
     const ph = await page(browser, EMAIL, { width: 390, height: 844 });
     await ph.goto(ph.emailFor('customers.html'));
