@@ -27,8 +27,8 @@ qualification) has no customer data.
 
 ## Deploy
 
-The sandbox and live deploys run from Operations' Deploy workflow (it holds the Firebase deploy keys). It checks out this
-repository and deploys `hosting:udcl` and `functions:udcl` to the site `<project>-customers` (made the first time).
+The **Deploy Customer List** workflow (Actions, Run workflow) deploys `hosting:udcl` and `functions:udcl` to the site
+`<project>-customers` (made the first time). It needs the secret `FIREBASE_SERVICE_ACCOUNT_SANDBOX` (the same Firebase deploy key as Operations).
 
 ## Tests
 
