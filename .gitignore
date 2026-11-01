@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.firebase/
+functions/.env
+*.xlsx
+*.xlsb
+*.xls
+*.csv
+functions/node_modules

@@ -1,0 +1,4 @@
+{
+  "projects": { "default": "demo-ud-distribution" },
+  "targets": { "demo-ud-distribution": { "hosting": { "udcl": ["demo-ud-distribution"] } } }
+}
