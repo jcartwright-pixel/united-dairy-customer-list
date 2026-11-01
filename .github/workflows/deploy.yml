@@ -1,7 +1,7 @@
 name: Deploy Customer List (Firebase)
 
 # Puts the Customer List live on its own web site in Operations' Firebase project: <project>-customers.web.app.
-# Run by hand ("Run workflow"): sandbox any time; production only from main with DEPLOY PRODUCTION typed.
+# Run by hand ("Run workflow"): sandbox any time; production only from main (Joe 11/1: no confirm box to type).
 # Needs this repository's secret FIREBASE_SERVICE_ACCOUNT_SANDBOX (or _PRODUCTION): the same Firebase deploy key Operations uses.
 # Without it, it stops with a notice and deploys nothing. It deploys only this app's site and functions (group udcl), never
 # Operations' screens, functions or database rules.
@@ -14,11 +14,6 @@ on:
         default: sandbox
         type: choice
         options: [sandbox, production]
-      confirm:
-        description: For production only, type DEPLOY PRODUCTION
-        required: false
-        default: ''
-        type: string
 
 permissions:
   contents: read
@@ -41,14 +36,12 @@ jobs:
           SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
           SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
           TARGET: ${{ inputs.target }}
-          CONFIRM: ${{ inputs.confirm }}
           REF: ${{ github.ref }}
         shell: bash
         run: |
           set -euo pipefail
           if [ "$TARGET" = production ]; then
             [ "$REF" = refs/heads/main ] || { echo "::error::Production deploys only from main"; exit 1; }
-            [ "$CONFIRM" = 'DEPLOY PRODUCTION' ] || { echo "::error::Type DEPLOY PRODUCTION in the confirm box"; exit 1; }
             sa="$SA_PRODUCTION"
           else sa="$SA_SANDBOX"; fi
           if [ -z "$sa" ]; then echo "::notice::No deploy key for $TARGET in this repository's secrets; nothing was deployed."; echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0; fi
