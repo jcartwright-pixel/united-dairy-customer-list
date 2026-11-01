@@ -98,7 +98,7 @@ let installPrompt = null;
 window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); installPrompt = ev; document.dispatchEvent(new Event('udcl-installable')); });
 /** Whether this window is already the installed app. */
 export const installed = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-/** Opens the browser's own Install box; false when the browser has none to give (iPhone and iPad: Share, Add to Home Screen). */
+/** Opens the browser's own Install box (Chrome or Edge on a computer); false when the browser has none to give. */
 export async function installApp() {
   if (!installPrompt) return false;
   installPrompt.prompt();

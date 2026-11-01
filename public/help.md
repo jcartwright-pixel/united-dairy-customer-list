@@ -11,7 +11,7 @@ The **United Dairy Customer List** is its own app. It keeps every customer, the 
 1. Pick a screen from the tiles or the menu under the header. **Administration** shows only to administrators.
 2. Someone set up for more than one plant picks the plant in the header.
 
-3. To get the Customer List as its own app (its own window and icon, like the Operations app), press `Install the app` on Home. On an iPhone or iPad, tap Share, then **Add to Home Screen**. In Chrome or Edge on a computer you can also use the install icon at the right end of the address bar.
+3. To get the Customer List as its own app on your computer (its own window and icon, like the Operations app), press `Install the app` on Home in Chrome or Edge, or use the install icon at the right end of the address bar.
 
 > The `? Help` button on every screen opens its own part of this guide.
 
