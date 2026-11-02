@@ -1,7 +1,8 @@
 name: Deploy Customer List (Firebase)
 
 # Puts the Customer List live on its own web site in Operations' Firebase project: <project>-customers.web.app.
-# Run by hand ("Run workflow"): sandbox any time; production only from main (Joe 11/1: no confirm box to type).
+# Run by hand ("Run workflow"): production is the default (Joe 11/2: just Run, no drop-down to pick), only from main;
+# sandbox any time by picking it (Claude does that for testing). No confirm box to type (Joe 11/1).
 # Needs this repository's secret FIREBASE_SERVICE_ACCOUNT_SANDBOX (or _PRODUCTION): the same Firebase deploy key Operations uses.
 # Without it, it stops with a notice and deploys nothing. It deploys only this app's site and functions (group udcl), never
 # Operations' screens, functions or database rules.
@@ -11,7 +12,7 @@ on:
       target:
         description: sandbox or production
         required: true
-        default: sandbox
+        default: production
         type: choice
         options: [sandbox, production]
 
