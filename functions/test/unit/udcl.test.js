@@ -57,7 +57,7 @@ const MENU = [
 test('the Route Menu tab is read: day, route, account, chain, load sequence; repeats once; no route kept apart', () => {
   const m = U.menuStops(MENU);
   assert.equal(m.stops.length, 5);
-  assert.deepEqual(m.stops[0], { day: 'TUE', route: '900', account: '5001', chain: '', name: 'ACME MARKET', loadSeq: 3, key: '5001' });
+  assert.deepEqual(m.stops[0], { day: 'TUE', route: '900', account: '5001', chain: '0', name: 'ACME MARKET', loadSeq: 3, key: '5001' });
   assert.equal(m.stops[1].chain, '415');
   assert.equal(m.stops[2].account, '5003');
   assert.equal(m.stops[2].loadSeq, 7, 'a 0 typed over the load column falls back to the one before');

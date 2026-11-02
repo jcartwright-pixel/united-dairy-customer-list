@@ -94,7 +94,8 @@
       var route = numText(row[cRoute], LIMITS.route), account = numText(row[cAcct], LIMITS.account), chain = numText(row[cChain], LIMITS.chain);
       // The tab's load sequence sits in LOAD SEQ, or in the two columns after Name (the second is the one typed over).
       var seq = cSeq >= 0 ? seqOf(row[cSeq]) : (seqOf(row[cName + 2]) || seqOf(row[cName + 1]));
-      var x = { day: day, route: route, account: account === '0' ? '' : account, chain: chain === '0' ? '' : chain, name: name, loadSeq: seq };
+      var x = { day: day, route: route, account: account === '0' ? '' : account, chain: chain, // Joe 11/2: a chain of 0 is chain 0, not blank
+      name: name, loadSeq: seq };
       x.key = custKey(x.account, x.name);
       var k = [x.day, x.route, x.key].join('|');
       if (seen[k]) continue;

@@ -199,7 +199,7 @@ async function importMenu(db, plant, email, input, stamp) {
   const stops = (Array.isArray(input.stops) ? input.stops : []).slice(0, U.MAX_LINES);
   const unrouted = (Array.isArray(input.unrouted) ? input.unrouted : []).slice(0, U.MAX_LINES);
   if (!stops.length) fail('BAD_REQUEST', 'No customer lines were found. Pick the Route Menu workbook with its Customer By Route tab.');
-  const clean = (s) => { const x = { day: U.dayOf(s.day), route: U.numText(s.route, U.LIMITS.route), account: U.numText(s.account, U.LIMITS.account), chain: U.numText(s.chain, U.LIMITS.chain), name: U.text(s.name, U.LIMITS.name), loadSeq: U.seqOf(s.loadSeq) }; if (x.account === '0') x.account = ''; if (x.chain === '0') x.chain = ''; x.key = U.custKey(x.account, x.name); return x; };
+  const clean = (s) => { const x = { day: U.dayOf(s.day), route: U.numText(s.route, U.LIMITS.route), account: U.numText(s.account, U.LIMITS.account), chain: U.numText(s.chain, U.LIMITS.chain), name: U.text(s.name, U.LIMITS.name), loadSeq: U.seqOf(s.loadSeq) }; if (x.account === '0') x.account = ''; x.key = U.custKey(x.account, x.name); return x; };
   const lines = stops.map(clean).filter(x => x.day && x.route && x.name), loose = unrouted.map(clean).filter(x => x.day && x.name);
   const addresses = input.addresses || {}, gps = input.gps || {}, book = input.book || {};
   const now = await readPlant(db, plant);
