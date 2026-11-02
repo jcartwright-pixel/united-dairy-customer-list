@@ -177,6 +177,38 @@ async function ph0(browser) {
     assert.equal(await k.$$eval('#udcl-nav', x => x.length), 0, 'and no menu');
     await shot(k, 'udcl-1920-kiosk');
 
+    // Joe 11/2: Route Sequence's Edit box moves a stop to another route; the Load Map window, opened from it, changes it live.
+    const q = await page(browser, EMAIL);
+    await q.goto(q.emailFor('route-sequence.html?route=803&day=TUE'));
+    await q.waitForSelector('#rows tr[data-drag="1526"]');
+    assert.equal(await q.$$eval('#rows button.rm', x => x.length), 0, 'no Remove button any more');
+    const at = await q.$$eval('#rows tr[data-drag]', r => r.findIndex(x => x.dataset.drag === '1526'));
+    await q.click('#rows button[data-ed="' + at + '"]');
+    await q.waitForSelector('#edit .ed-days input');
+    assert.deepEqual(await q.$$eval('#ed-days input:checked', x => x.map(i => i.value)), ['TUE']);
+    await q.selectOption('#ed-route', '805');
+    await q.uncheck('#ed-days input[value="TUE"]');
+    await q.check('#ed-days input[value="THU"]');
+    assert.match(await q.textContent('#ed-what'), /Moves to route 805\. Comes off route 803 on Tuesday\. Goes on route 805 on Thursday/);
+    await q.fill('#ed-cnotes', 'Back door after 6');
+    await shot(q, 'udcl-1920-edit-stop');
+    await q.click('#ed-save');
+    await q.waitForSelector('#edit', { state: 'detached' });
+    await q.waitForFunction(() => !document.querySelector('#rows tr[data-drag="1526"]'));
+    const tue803 = (await db().collection('udclRouteDays').doc('fac_uniontown__803__TUE').get()).data().stops.map(x => x.key);
+    assert.equal(tue803.includes('1526'), false);
+    assert.ok((await db().collection('udclRouteDays').doc('fac_uniontown__805__THU').get()).data().stops.some(x => x.key === '1526'));
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__1526').get()).data().notes, 'Back door after 6');
+    const [win] = await Promise.all([q.waitForEvent('popup'), q.click('#open-map')]);
+    await win.waitForSelector('#rows input.lm-seq');
+    assert.equal(await win.isVisible('#udcl-nav'), false, 'the Load Map window has no menu');
+    assert.match(await win.textContent('#title'), /Route 803 · Tuesday/);
+    const first = await win.$eval('#rows tr[data-drag]', r => r.dataset.drag);
+    await win.fill('#rows input.lm-seq[data-i="0"]', '12');
+    await win.press('#rows input.lm-seq[data-i="0"]', 'Tab');
+    await q.waitForFunction((k) => { const r = document.querySelector('#rows tr[data-drag="' + k + '"] input.seq'); return r && r.value === '12'; }, first, { timeout: 10000 });
+    await shot(win, 'udcl-load-map-window');
+
     // Joe 11/1: "want to downloadable app": every page names the app's manifest, and its icons are there.
     await ph0(browser);
     // A phone width.

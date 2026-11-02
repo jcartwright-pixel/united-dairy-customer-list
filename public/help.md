@@ -52,13 +52,19 @@ One route on one day, its stops in the order the driver runs them. This is where
 2. Drag a stop up or down to its new place, or use the arrows. **Run Seq** is the run order: the order the driver delivers.
 3. **Load Seq** is the stop's load sequence: where its product sits on the truck. Load 1 goes on first, at the front; the highest number is at the back door. Type a new number to change it; the truck load map's spots with the old number change to the new one.
 4. **Stop note** is a note for this stop on this day (the customer's own notes, on its card, show on every day).
-5. On the right: the **Start time**, the **Instructions for this route day**, `Add a stop` (pick a customer) and a small copy of the **Truck load map** (`Change the load map` opens it).
-6. `Print` opens the print menu: this route day for the office, the driver's route book page (with keys, Time in and Time out boxes, the instructions and the load map), this route day's load map, every day of this route, every route on this day, or the whole route book.
+5. `Edit` on a stop opens its edit box. On the left: the **Route** and the **Delivery days on this route**. Tick a day to add the stop on that day, untick one to take it off, or pick another route to move it there (the same days stay ticked). The box says what will change. On the right: the **Note for this stop** (this route and day only) and the **Notes for the driver** (every day). Press `Save`. `Take off route …` (press it twice) takes the customer off this route on every day.
+6. On the right: the **Start time**, the **Instructions for this route day**, `Add a stop` (pick a customer) and a small copy of the **Truck load map** (`Change the load map` opens it).
+7. `Load Map` opens the truck load map in its own window: the truck, the customers and their load sequence, nothing else. Change the run order, a load sequence or the truck there, and this screen shows it at once (and the other way round).
+8. `Print` opens the print menu: this route day for the office, the driver's route book page (with keys, Time in and Time out boxes, the instructions and the load map), this route day's load map, every day of this route, every route on this day, or the whole route book.
 
 - Only an Administrator or Manager can change the order. Everyone else can look and print.
 - Every change saves by itself. If someone else changed the same route day a moment before, the screen says so and shows their change; make yours again.
 
+> A stop added to a day goes in by its load sequence (after the stops with the same or a higher number). Drag it if it belongs somewhere else.
+
 > After you change a sequence, print the office sheet from the `Print` menu so the office has it. The drivers' phones show the new order at once (**Route Book**). Route Sequence, Truck Load Map and the drivers' Route Book all show the same route days, so a change on one shows on the others.
+
+!> Do not untick every day by mistake: with no day ticked, `Save` takes the customer off the route.
 
 !> Do not leave a stop without a load sequence. The load map and the loaders need a number for every stop.
 

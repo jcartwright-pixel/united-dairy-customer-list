@@ -117,3 +117,32 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .udcl-install { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 16px; padding: 14px 16px; border: 1px solid #c9d6e3; border-radius: 10px; background: #fff; }
 .udcl-install b { font-size: 17px; color: #074c84; }
 .udcl-install button { margin-left: auto; }
+
+/* Route Sequence: Edit a stop (Joe 11/2): the route and days on the left, the notes on the right. */
+.udcl-modal { position: fixed; inset: 0; background: rgba(10, 25, 45, .45); z-index: 70; display: grid; place-items: center; padding: 16px; }
+.udcl-modal .box { background: #fff; border-radius: 12px; width: min(860px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.3); overflow: hidden; }
+.udcl-modal header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: var(--ud-blue); color: #fff; }
+.udcl-modal header h2 { margin: 0; font-size: 20px; flex: 1; }
+.udcl-modal header h2 small { font-weight: 600; opacity: .8; }
+.udcl-modal header button { background: #fff; color: var(--ud-blue); border: 0; border-radius: 6px; padding: 6px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.udcl-modal .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; padding: 16px 18px; overflow: auto; }
+.udcl-modal .left, .udcl-modal .right { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.udcl-modal label, .udcl-modal .lbl { display: grid; gap: 4px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.udcl-modal small { font-weight: 500; color: var(--muted); }
+.udcl-modal select, .udcl-modal textarea { font: inherit; font-weight: 600; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; box-sizing: border-box; }
+.udcl-modal textarea { min-height: 110px; resize: vertical; }
+.udcl-modal .ed-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.udcl-modal .ed-day { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.udcl-modal .ed-day:has(input:checked) { background: #e3eefa; border-color: var(--ud-blue); }
+.udcl-modal .ed-what { margin: 0; min-height: 1.2em; color: var(--ud-blue); font-weight: 600; }
+.udcl-modal button.danger { justify-self: start; background: #fff; color: #b3261e; border: 1px solid #e3a7a3; border-radius: 8px; padding: 8px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.udcl-modal footer { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.udcl-modal footer span { flex: 1; font-weight: 600; }
+.udcl-modal footer span.bad { color: #b3261e; }
+.udcl-modal footer button { font: inherit; font-weight: 700; border-radius: 8px; padding: 8px 16px; cursor: pointer; border: 1px solid var(--line); background: #fff; }
+.udcl-modal footer button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+#rows button.ed { font-weight: 700; color: var(--ud-blue); }
+
+/* The Load Map window opened from Route Sequence (Joe 11/2): the truck, the customers and their load sequence; no menu or notes. */
+body.udcl-mini #udcl-nav, body.udcl-mini .help-link, body.udcl-mini #route-field, body.udcl-mini #notes { display: none !important; }
+body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(4) { display: none; }

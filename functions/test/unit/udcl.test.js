@@ -209,6 +209,32 @@ test('Joe 11/1: a new upload overrules what was changed here; what the files do 
   assert.equal(after.stops.find(s => s.key === '5001').note, 'Side door', 'a stop note stays');
 });
 
+test('Joe 11/2: Edit on Route Sequence moves a stop to other days and another route, or takes it off', async () => {
+  const { db } = await imported();
+  const view = () => S.udclCall(db, mgr, PLANT, { op: 'view' });
+  const rd = (v, r, d) => v.routeDays.find(x => x.route === r && x.day === d);
+  await assert.rejects(S.udclCall(db, disp, PLANT, { op: 'placeStop', key: '5001', from: '900', days: [] }), /Administrator or Manager/);
+  // ACME is on 900 Tuesday and Friday: keep Tuesday (load 4, a note), add Wednesday (a new day for 900), take Friday off.
+  const out = await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '900', route: '900', day: 'TUE', days: ['TUE', 'WED'], loadSeq: 4, note: 'Side door' }, now);
+  assert.equal(out.changed.length, 3);
+  let v = await view();
+  assert.deepEqual(rd(v, '900', 'TUE').stops.find(s => s.key === '5001'), Object.assign({}, rd(v, '900', 'TUE').stops.find(s => s.key === '5001'), { loadSeq: 4, note: 'Side door' }));
+  assert.equal(rd(v, '900', 'WED').stops[0].key, '5001');
+  assert.equal(rd(v, '900', 'WED').stops[0].loadSeq, 4);
+  assert.ok(rd(v, '900', 'WED').map, 'a new route day gets a load map');
+  assert.equal(rd(v, '900', 'FRI').stops.some(s => s.key === '5001'), false);
+  // Move it to route 901 on Wednesday: off 900 everywhere, on 901 Wednesday (load 4 goes before DAIRY DELITE, which has none).
+  await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '900', route: '901', day: 'TUE', days: ['WED'] }, now);
+  v = await view();
+  assert.equal(rd(v, '900', 'TUE').stops.some(s => s.key === '5001'), false);
+  assert.equal(rd(v, '900', 'WED').stops.length, 0);
+  assert.deepEqual(rd(v, '901', 'WED').stops.map(s => s.key), ['5001', '5004']);
+  // No days: off the route.
+  await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '901', days: [] }, now);
+  v = await view();
+  assert.deepEqual(rd(v, '901', 'WED').stops.map(s => s.key), ['5004']);
+});
+
 test('a route day off the Route Menu is removed and its customer no longer active; customers are added and changed', async () => {
   const { db } = await imported();
   const m = U.menuStops(MENU.filter(r => r[1] !== 901));

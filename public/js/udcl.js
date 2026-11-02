@@ -26,6 +26,13 @@ export async function readList() {
 }
 export async function saveStep(op, fields) { return callServer('customerList', Object.assign({ op }, fields)); }
 
+/* ---------- other windows (Joe 11/2: the Load Map window opened from Route Sequence; an edit in one shows in the other) ---------- */
+const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('udcl-changes') : null;
+/** Tells the Customer List's other open windows that a route day changed, so they read the list again. */
+export function announceChange(route, day) { try { if (channel) channel.postMessage({ route, day, at: Date.now() }); } catch (e) { /* no channel */ } }
+/** fn(change) runs when another window saved a change. */
+export function onChange(fn) { if (channel) channel.onmessage = (ev) => fn(ev.data || {}); }
+
 /* ---------- load sequence colours (the same number has the same colour everywhere, and in print) ---------- */
 const COLOURS = ['#ffd54f', '#81d4fa', '#a5d6a7', '#f48fb1', '#ce93d8', '#ffab91', '#80cbc4', '#e6ee9c', '#b0bec5', '#fff59d', '#90caf9', '#c5e1a5', '#ef9a9a', '#b39ddb', '#ffcc80', '#80deea', '#bcaaa4', '#f8bbd0', '#dce775', '#9fa8da'];
 export function seqColour(n) { return n ? COLOURS[(Number(n) - 1) % COLOURS.length] : '#e9eef3'; }

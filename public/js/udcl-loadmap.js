@@ -6,10 +6,13 @@
 // two minutes so a change made in the office shows on the floor.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
 import { mountRowDrag } from './row-drag.js';
-import { readList, saveStep, printMenu, printDoc, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, seqColour, followLoadSeq, U } from './udcl.js';
+import { readList, saveStep, printMenu, printDoc, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, seqColour, followLoadSeq, announceChange, onChange, U } from './udcl.js';
 
 const params = new URLSearchParams(location.search);
 const KIOSK = params.get('kiosk') === '1';
+// Joe 11/2: ?window=1 is the Load Map window Route Sequence opens: the truck, the customers and their load sequence, no menu or notes.
+const MINI = !KIOSK && params.get('window') === '1';
+if (MINI) document.body.classList.add('udcl-mini');
 let data = null, route = params.get('route') || '', day = U.dayOf(params.get('day')) || (KIOSK ? todayKey() : '');
 let brush = 0, painting = false, pending = null, timer = 0;
 const $ = (id) => document.getElementById(id);
@@ -27,14 +30,15 @@ function pickDefaults() {
     const days = data.routeDays.filter(x => x.route === route).map(x => x.day);
     if (!days.includes(day)) day = days.includes(todayKey()) ? todayKey() : days.sort((a, b) => U.dayIndex(a) - U.dayIndex(b))[0] || '';
   }
-  history.replaceState(null, '', '?' + (KIOSK ? 'kiosk=1&' : '') + 'route=' + encodeURIComponent(route) + '&day=' + day);
+  history.replaceState(null, '', '?' + (KIOSK ? 'kiosk=1&' : MINI ? 'window=1&' : '') + 'route=' + encodeURIComponent(route) + '&day=' + day);
 }
 
 function draw() {
   if (!data) return;
   pickDefaults();
   const rd = current(), map = rd ? (pending || U.cleanMap(rd.map || U.autoMap(rd.stops || []))) : null;
-  $('title').textContent = KIOSK ? 'Load Map' + (rd ? ' · Route ' + route : '') : 'Truck Load Map';
+  $('title').textContent = KIOSK ? 'Load Map' + (rd ? ' · Route ' + route : '') : MINI ? 'Route ' + route + (day ? ' · ' + U.DAY_NAMES[day] : '') : 'Truck Load Map';
+  if (MINI) document.title = 'Load Map · Route ' + route + (day ? ' ' + U.DAY_NAMES[day] : '');
   $('route-field').hidden = KIOSK;
   $('route').innerHTML = routesOf(data.routeDays).map(r => '<option value="' + e(r) + '"' + (r === route ? ' selected' : '') + '>Route ' + e(r) + '</option>').join('');
   $('days').innerHTML = U.DAYS.map(d => '<button type="button" data-day="' + d + '" aria-pressed="' + (d === day) + '"' + (KIOSK || rdOf(route, d) ? '' : ' disabled') + '>' + U.DAY_NAMES[d].slice(0, 3) + '</button>').join('');
@@ -80,6 +84,7 @@ async function flush() {
   try {
     const out = await saveStep('saveRouteDay', { route: rd.route, day: rd.day, rev: rd.rev, map });
     data.routeDays[data.routeDays.indexOf(rd)] = out.routeDay;
+    announceChange(rd.route, rd.day);
     if (pending === map) pending = null;
     showError('');
   } catch (err) { pending = null; showError(serverText(err, 'the customer list')); try { data = Object.assign(data, await readList()); } catch (e2) { /* keep */ } }
@@ -107,6 +112,7 @@ function saveStops(list, map) {
       const out = await saveStep('saveRouteDay', Object.assign({ route: r, day: d, rev: rd.rev, stops: list }, map ? { map } : {}));
       const i = data.routeDays.indexOf(rdOf(r, d));
       if (i >= 0) data.routeDays[i] = out.routeDay;
+      announceChange(r, d);
       showError('');
     } catch (err) { showError(serverText(err, 'the customer list')); try { data = Object.assign(data, await readList()); } catch (e2) { /* keep */ } }
     draw();
@@ -166,5 +172,7 @@ requireSignIn(async () => {
   await read();
   // Route Sequence, this screen and the drivers' Route Book share one copy: coming back to this tab shows changes made there.
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !pending) read(); });
+  // A change saved in Route Sequence (or another window): read the list again at once.
+  onChange(() => { stopSaving.then(() => { if (!pending) read(); }); });
   if (KIOSK) setInterval(() => { if (KIOSK && day !== todayKey() && !params.get('day')) day = todayKey(); read(); }, 120000);
 });

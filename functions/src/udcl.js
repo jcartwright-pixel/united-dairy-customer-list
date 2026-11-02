@@ -104,6 +104,59 @@ async function saveRouteDay(db, plant, email, input, stamp) {
   });
 }
 
+/**
+ * Joe 11/2 (Route Sequence, Edit): one customer's place on the routes. Takes it off route `from` on every day not kept, and puts it
+ * on route `route` on each day in `days` (a day the route did not run yet starts a new route day). On a day it is new to, it goes
+ * after the last stop with the same or a higher load sequence. `day` (the day being edited) gets `loadSeq` and `note`; a day it is
+ * added to takes that load sequence too. days empty = taken off route `from` altogether.
+ */
+async function placeStop(db, plant, email, input, stamp) {
+  const key = U.text(input.key, 60), from = U.numText(input.from, U.LIMITS.route), route = U.numText(input.route, U.LIMITS.route) || from;
+  const day = U.dayOf(input.day), days = [...new Set((Array.isArray(input.days) ? input.days : []).map(U.dayOf).filter(Boolean))];
+  if (!key || !from || !route) fail('BAD_REQUEST', 'Pick a customer and a route.');
+  const loadSeq = input.loadSeq === undefined ? undefined : U.seqOf(input.loadSeq), note = input.note === undefined ? undefined : U.text(input.note, U.LIMITS.note);
+  const cref = db.collection(CUSTOMERS).doc(U.customerId(plant, key));
+  const refs = {};
+  U.DAYS.forEach(d => { refs[from + '|' + d] = db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, from, d)); refs[route + '|' + d] = db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, route, d)); });
+  const keys = Object.keys(refs);
+  return db.runTransaction(async tx => {
+    const c = await tx.get(cref);
+    if (!c.exists) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
+    const cust = c.data(), snaps = await tx.getAll(...keys.map(k => refs[k]));
+    const docs = {};
+    keys.forEach((k, i) => { docs[k] = snaps[i].exists ? snaps[i].data() : null; });
+    const was = (day && docs[from + '|' + day] && (docs[from + '|' + day].stops || []).find(x => x.key === key)) || null;
+    const seq = loadSeq !== undefined ? loadSeq : (was ? was.loadSeq : 0);
+    const changed = {};
+    keys.forEach(k => {
+      const [r, d] = k.split('|'), before = docs[k], keep = r === route && days.includes(d);
+      let stops = before ? (before.stops || []).slice() : [];
+      const at = stops.findIndex(x => x.key === key);
+      if (keep) {
+        if (at < 0) {
+          const stop = { key, account: cust.account || '', name: cust.name || '', chain: cust.chain || '', loadSeq: seq, note: d === day && note !== undefined ? note : '' };
+          let i = stops.length;
+          while (i > 0 && (Number(stops[i - 1].loadSeq) || 0) < seq) i--;
+          stops.splice(i, 0, stop);
+        } else if (d === day) {
+          stops[at] = Object.assign({}, stops[at], loadSeq !== undefined ? { loadSeq } : {}, note !== undefined ? { note } : {});
+        } else return;
+      } else {
+        if (r !== from || at < 0) return;
+        stops.splice(at, 1);
+      }
+      const after = Object.assign({ plant, route: r, day: d, stops: [], startTime: '', notes: '', map: null, rev: 0 }, before || {});
+      after.stops = stops;
+      if (!before) after.map = U.packMap(U.autoMap(stops));
+      after.rev = (before ? before.rev || 0 : 0) + 1;
+      after.updatedAt = stamp; after.updatedBy = email;
+      changed[k] = [before, after];
+    });
+    Object.keys(changed).forEach(k => { const [before, after] = changed[k]; tx.set(refs[k], after); logEntry(db, tx, 'routeDay', plant, refs[k], before, after, email, stamp); });
+    return { ok: true, changed: Object.keys(changed).map(k => unpack(changed[k][1])), message: Object.keys(changed).length ? '' : 'Nothing to change.' };
+  });
+}
+
 /** Saves a customer (or adds one: input.add with an account number, or a name for a customer with none). */
 async function saveCustomer(db, plant, email, input, stamp) {
   const fields = U.cleanCustomer(input.fields || {});
@@ -249,8 +302,8 @@ async function routeBook(db, plant, route, day) {
   return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops, updatedAt: rd.updatedAt || '' };
 }
 
-const OPS = { saveRouteDay, saveCustomer, importMenu, copySales };
-const NEEDS = { saveRouteDay: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList' };
+const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales };
+const NEEDS = { saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
@@ -286,4 +339,4 @@ async function salesRows(db, plant) {
   return { rows, savedAt: at };
 }
 
-module.exports = { udclCall, salesRows, routeBook, importMenu, saveRouteDay, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
+module.exports = { udclCall, salesRows, routeBook, importMenu, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
