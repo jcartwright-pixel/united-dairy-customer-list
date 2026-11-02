@@ -310,3 +310,19 @@ test('Joe 11/2: checked addresses are loaded and stay through the next upload; a
   assert.equal(v.customers['5003'].address2, '', 'a PO box second line is left off');
   assert.equal((await S.loadAddresses(db, PLANT, [{ key: '5002', address: '3349 PITTSBURGH ST', city: 'PERRYOPOLIS', state: 'PA', zip: '15473', confidence: 'high', source: 'store site' }], 'loader@workflow', now)).same, 1);
 });
+
+test('Import Addresses reads a sheet of checked addresses by its headings; only an administrator imports it', async () => {
+  const rows = U.checkedAddressRows([
+    ['Status', 'Confidence', 'Account', 'Chain', 'Customer', 'Ship-to street', 'City', 'State', 'Zip', 'Where it came from'],
+    ['looked up', 'high', 5002, 415, 'BEST FOODS #2', '3349 Pittsburgh St', 'Perryopolis', 'pa', 15473, 'store site'],
+    ['', '', '', '', 'no account', '1 X St', 'Y', 'PA', '', ''],
+    ['', '', 5003, '', 'no street', '', 'Y', 'PA', '', '']
+  ]);
+  assert.deepEqual(rows, [{ key: '5002', address: '3349 Pittsburgh St', address2: '', city: 'Perryopolis', state: 'PA', zip: '15473', confidence: 'high', source: 'store site' }]);
+  assert.deepEqual(U.checkedAddressRows([['DAY', 'ROUTE']]), []);
+  const { db } = await imported();
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importAddresses', rows }), /Only an administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'importAddresses', rows }, now);
+  assert.equal(out.counts.changed, 1);
+  assert.match(out.message, /stay through the next Route Menu upload/);
+});

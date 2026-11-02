@@ -129,6 +129,8 @@ function openImport() {
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<button type="button" class="primary" id="i-go">Read and import</button><div id="i-msg"></div><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button>' +
+    '<p><b>Checked ship-to addresses</b>: a sheet with Account, Street, City, State and Zip headings (addresses looked up by the store\'s name, never a PO box). They replace the addresses here and stay through the next Route Menu upload.</p>' +
+    '<label>Addresses sheet (.xlsx, .csv)<input type="file" id="i-addr" accept=".xlsx,.xls,.csv"></label><button type="button" id="i-addr-go">Import Addresses</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
   $('i-go').onclick = async () => {
@@ -153,6 +155,20 @@ function openImport() {
       setData(out);
       const c = out.counts;
       say(out.message + ' ' + c.added + ' new customers, ' + c.filled + ' had their address or keys filled in, ' + c.inactive + ' no longer on the Route Menu, ' + c.removedDays + ' route days removed.' + (c.noLoadSeq ? ' ' + c.noLoadSeq + ' stops have no load sequence in the Route Menu: give them one on Route Book.' : ''), 'good');
+    } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
+  };
+  $('i-addr-go').onclick = async () => {
+    const f = $('i-addr').files[0];
+    if (!f) return say('Pick the addresses sheet first.', 'bad');
+    try {
+      say('Reading ' + f.name + '…');
+      const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
+      let rows = [];
+      wb.SheetNames.some(n => (rows = U.checkedAddressRows(sheetRows(X, wb, n))).length);
+      if (!rows.length) return say('No sheet with Account, Street and City headings was found in ' + f.name + '.', 'bad');
+      const out = await saveStep('importAddresses', { rows, thenView: true });
+      setData(out);
+      say(out.message, 'good');
     } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
   };
   $('i-sales').onclick = async () => {
