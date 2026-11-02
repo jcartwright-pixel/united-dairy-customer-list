@@ -427,3 +427,24 @@ test('Joe 11/2: a master list with a City heading and no second-line column leav
   const rows = U.fullListRows([['DC', 'Chain', 'Account', 'Customer', 'Street', 'City', 'State', 'Zip'], [30, 0, 1196, 'ACORN CORNER MARKET', '12 ELM ST', 'MAPLETON', 'PA', 15401]]);
   assert.equal(rows[0].address2, ''); assert.equal(rows[0].city, 'MAPLETON'); assert.equal(rows[0].zip, '15401');
 });
+
+test('Joe 11/2: an inactive customer shows nowhere else: not on the screens, the Sales app or the route days; only an administrator sets it', async () => {
+  const { db } = await imported();
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'setActive', key: '5001', inactive: true }, now), /administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'setActive', key: '5001', inactive: true }, now);
+  assert.deepEqual(out.removedFrom.sort(), ['route 900 Friday', 'route 900 Tuesday']);
+  const v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.equal(v.customers['5001'], undefined); assert.equal(v.inactiveHidden, 1);
+  assert.ok(v.routeDays.every(rd => rd.stops.every(s => s.key !== '5001')));
+  assert.equal((await S.udclCall(db, boss, PLANT, { op: 'view', all: true })).customers['5001'].inactive, true, 'the Master Customer List has it');
+  assert.equal((await S.udclCall(db, mgr, PLANT, { op: 'view', all: true })).customers['5001'], undefined, 'only for an administrator');
+  assert.ok(!(await S.salesRows(db, PLANT)).rows.some(r => r.account === '5001'));
+  const back = await S.udclCall(db, boss, PLANT, { op: 'setActive', key: '5001', inactive: false }, now);
+  assert.match(back.message, /active again/);
+  assert.ok((await S.udclCall(db, boss, PLANT, { op: 'view' })).customers['5001']);
+});
+
+test('Joe 11/2: the master list reads an Active / Status column', () => {
+  const rows = U.fullListRows([['Status', 'DC', 'Chain', 'Account', 'Customer', 'Street', 'City'], ['Inactive', 30, 0, 1, 'A', '1 X ST', 'T'], ['Active', 30, 0, 2, 'B', '2 X ST', 'T'], ['', 30, 0, 3, 'C', '3 X ST', 'T']]);
+  assert.deepEqual(rows.map(r => r.inactive), [true, false, undefined]);
+});

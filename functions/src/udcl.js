@@ -61,12 +61,17 @@ async function readPlant(db, plant) {
 }
 
 /** What every screen gets: the plant's customers and route days, and what this person may change. */
-async function view(db, plant, person) {
+async function view(db, plant, person, opts) {
   const d = await readPlant(db, plant), r = rightsOf(person);
+  // Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system." Only the Master Customer List (an
+  // administrator, asking with all) gets the inactive ones.
+  const all = !!(opts && opts.all && r.importList);
+  let inactive = 0;
+  if (!all) Object.keys(d.customers).forEach(k => { if (d.customers[k].inactive) { delete d.customers[k]; inactive++; } });
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
     customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
     master: d.meta && d.meta.master ? d.meta.master : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
-    canEdit: r.edit, canImport: r.importList };
+    inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList };
 }
 
 function logEntry(db, batchOrTx, what, plant, ref, before, after, email, stamp) {
@@ -216,7 +221,7 @@ async function importMenu(db, plant, email, input, stamp) {
     const x = people[key], before = now.customers[key] || null;
     const a = (x.account && addresses[x.account]) || {}, g = gps[U.nameKey(x.name)] || {};
     const after = Object.assign({ plant, key, account: x.account, name: x.name, chain: x.chain, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null }, before || {});
-    after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true;
+    after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true; delete after.inactive;
     if (!after.dc) after.dc = U.PLANT_DC[plant] || '';
     // What the upload has replaces what is here (counted when it changes something).
     const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && after[k] !== v) { after[k] = v; return 1; } return 0; };
@@ -306,7 +311,7 @@ async function routeBook(db, plant, route, day) {
   const rd = s.data(), keys = (rd.stops || []).map(x => x.key);
   const refs = keys.map(k => db.collection(CUSTOMERS).doc(U.customerId(plant, k)));
   const cs = refs.length ? await db.getAll(...refs) : [];
-  const stops = (rd.stops || []).map((x, i) => { const c = cs[i] && cs[i].exists ? cs[i].data() : {}; return { stop: i + 1, name: c.name || x.name, account: c.account || x.account || '', loadSeq: x.loadSeq || 0, note: x.note || '',
+  const stops = (rd.stops || []).map((x, i) => [x, cs[i] && cs[i].exists ? cs[i].data() : {}]).filter(([, c]) => !c.inactive).map(([x, c], i) => { return { stop: i + 1, name: c.name || x.name, account: c.account || x.account || '', loadSeq: x.loadSeq || 0, note: x.note || '',
     address: U.addressLine(c), phone: c.phone || '', keys: c.keys || '', notes: c.notes || '', lat: c.lat || null, lon: c.lon || null }; });
   return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops, updatedAt: rd.updatedAt || '' };
 }
@@ -415,6 +420,8 @@ async function importFullList(db, plant, email, input, stamp) {
     if (isFinite(la) && isFinite(lo) && la && lo) { after.lat = la; after.lon = lo; gps++; }
     // Joe 11/2: the master list can carry phones, contacts and groups too; a blank cell keeps what is here.
     ['phone', 'contact', 'group'].forEach(k => { const v = U.text(r[k], U.LIMITS[k] || 60); if (v) after[k] = v; });
+    // An Active / Status column, when the file has one, sets Active or Inactive; with none, what is here stays.
+    if (r.inactive === true) after.inactive = true; else if (r.inactive === false) delete after.inactive;
     if (r.check !== undefined) {
       after.addressCheck = U.text(r.check, 60); after.addressNote = U.text(r.checkNote, 300); after.addressProposed = U.text(r.proposed, 200); after.gpsFrom = U.text(r.gpsFrom, 80);
     }
@@ -448,8 +455,40 @@ async function importFullList(db, plant, email, input, stamp) {
     (removed ? ', ' + removed + ' from an earlier list removed' : '') + '. ' + gps + ' have GPS. Routes and notes were kept, and a phone or group the file leaves blank stays as it is here.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
 }
 
-const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+/**
+ * Joe 11/2, the Master Customer List: Active or Inactive. An inactive customer shows nowhere else (view, the Sales app, the
+ * drivers' route book), so making one inactive also takes it off every route day it is on. Making it active again does not put
+ * it back on a route: add it on Route Book (or the next Route Menu upload does).
+ */
+async function setActive(db, plant, email, input, stamp) {
+  const key = U.text(input.key, 60), inactive = input.inactive === true;
+  if (!key) fail('BAD_REQUEST', 'Pick a customer.');
+  const ref = db.collection(CUSTOMERS).doc(U.customerId(plant, key));
+  const rds = inactive ? (await db.collection(ROUTE_DAYS).where('plant', '==', plant).get()).docs.filter(d => (d.data().stops || []).some(x => x.key === key)) : [];
+  return db.runTransaction(async tx => {
+    const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
+    if (!before) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
+    const rrefs = rds.map(d => db.collection(ROUTE_DAYS).doc(d.id)), fresh = rrefs.length ? await tx.getAll(...rrefs) : [];
+    const after = Object.assign({}, before, { updatedAt: stamp, updatedBy: email });
+    if (inactive) after.inactive = true; else delete after.inactive;
+    tx.set(ref, after);
+    logEntry(db, tx, 'customer', plant, ref, before, after, email, stamp);
+    const off = [];
+    fresh.forEach((s, i) => {
+      if (!s.exists) return;
+      const b = s.data(), stops = (b.stops || []).filter(x => x.key !== key);
+      if (stops.length === (b.stops || []).length) return;
+      const a = Object.assign({}, b, { stops, rev: (b.rev || 0) + 1, updatedAt: stamp, updatedBy: email });
+      tx.set(rrefs[i], a);
+      logEntry(db, tx, 'routeDay', plant, rrefs[i], b, a, email, stamp);
+      off.push('route ' + b.route + ' ' + (U.DAY_NAMES[b.day] || b.day));
+    });
+    return { ok: true, customer: after, removedFrom: off, message: before.name + (inactive ? ' is inactive' + (off.length ? ' and was taken off ' + off.join(', ') : '') : ' is active again' + (before.inactive ? '. Add it to a route on Route Book' : '')) + '.' };
+  });
+}
+
+const OPS = { setActive, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { setActive: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
@@ -462,14 +501,14 @@ async function udclCall(db, who, plant, input, deps) {
   // No plant named (the first time on this browser): the person's first plant that is running.
   if (!plant) plant = L.plantsFor(person).find(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE') || L.HOME_PLANT;
   if (L.plantsFor(person).indexOf(plant) < 0) fail('NOT_ALLOWED', 'You are not set up for ' + plantName(plant) + '.');
-  if (op === 'view') return view(db, plant, person);
+  if (op === 'view') return view(db, plant, person, input);
   if (op === 'routeBook') return routeBook(db, plant, input.route, input.day);
   const fn = OPS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Customer List step: ' + op);
   if (!r[NEEDS[op]]) fail('NOT_ALLOWED', NEEDS[op] === 'importList' ? 'Only an administrator can import the customer list.' : 'Only an Administrator or Manager can change the customer list and route sequence.');
   const stamp = ((deps && deps.now) ? deps.now() : new Date()).toISOString();
   const out = await fn(db, plant, email, input, stamp);
-  return Object.assign(out, input.thenView ? await view(db, plant, person) : {});
+  return Object.assign(out, input.thenView ? await view(db, plant, person, input) : {});
 }
 
 /** The Sales app's lines from the Customer List: { rows: [{ day, route, account, chain, name }], savedAt }, or null when it has none. */
@@ -479,8 +518,8 @@ async function salesRows(db, plant) {
   const d = await readPlant(db, plant);
   if (!d.routeDays.length) return null;
   const rows = [];
-  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '', group: c.group || '' }); }));
-  ((d.meta && d.meta.unrouted) || []).forEach(x => rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '', group: ((d.customers[x.key] || {}).group) || '' }));
+  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false || c.inactive) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '', group: c.group || '' }); }));
+  ((d.meta && d.meta.unrouted) || []).forEach(x => (d.customers[x.key] || {}).inactive || rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '', group: ((d.customers[x.key] || {}).group) || '' }));
   const at = d.routeDays.map(r => r.updatedAt || '').concat(Object.values(d.customers).map(c => c.updatedAt || '')).sort().pop() || '';
   return { rows, savedAt: at };
 }

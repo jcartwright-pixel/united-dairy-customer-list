@@ -405,7 +405,7 @@
       var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt === undefined ? -1 : dflt; };
       var dc = at(['DC']), acct = at(['ACCOUNT']), name = at(['NAME', 'CUSTOMER']), chain = at(['CHAIN']);
       if (dc < 0 || acct < 0 || name < 0) continue;
-      // A sheet of looked-up ship-to addresses (it has a Confidence column) is not the master list: the Customer Address List tab reads it as checked addresses.
+      // A sheet of looked-up ship-to addresses (it has a Confidence column) is not the master list: the Master Customer List reads it as checked addresses.
       if (cells.indexOf('CONFIDENCE') >= 0) return [];
       // A file with address headings is read by them; only a file with none falls back to the columns after the name.
       var named = at(['ORIGINAL STREET', 'ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1', 'CITY', 'ORIGINAL CITY']) >= 0, after = function (n) { return named ? -1 : name + n; };
@@ -413,7 +413,7 @@
         city = at(['ORIGINAL CITY', 'CITY'], after(3)), st = at(['ORIGINAL STATE', 'STATE', 'ST'], after(4)), zip = at(['ORIGINAL ZIP', 'ZIP', 'ZIP CODE'], after(5)),
         lat = at(['LATITUDE', 'LAT']), lon = at(['LONGITUDE', 'LON', 'LNG']), check = at(['MATCH STATUS']), note = at(['REVIEW NOTES']), prop = at(['MATCHED ADDRESS']),
         changed = at(['ADDRESS CHANGED?']), from = at(['COORDINATE SOURCE']),
-        phone = at(['PHONE', 'PHONE NUMBER', 'TELEPHONE', 'PHONE #']), contact = at(['CONTACT', 'CONTACT NAME']), group = at(['GROUP']);
+        phone = at(['PHONE', 'PHONE NUMBER', 'TELEPHONE', 'PHONE #']), contact = at(['CONTACT', 'CONTACT NAME']), group = at(['GROUP']), status = at(['ACTIVE', 'STATUS', 'ACTIVE / INACTIVE', 'ACTIVE/INACTIVE']);
       var cell = function (row, i, max) { return i >= 0 ? text(row[i], max) : ''; };
       var num = function (row, i) { var v = i >= 0 ? Number(row[i]) : NaN; return isFinite(v) && v ? v : null; };
       var out = [];
@@ -427,6 +427,7 @@
         if (phone >= 0 && cell(row, phone, LIMITS.phone)) x.phone = cell(row, phone, LIMITS.phone);
         if (contact >= 0 && cell(row, contact, LIMITS.contact)) x.contact = cell(row, contact, LIMITS.contact);
         if (group >= 0 && cell(row, group, LIMITS.group)) x.group = cell(row, group, LIMITS.group);
+        if (status >= 0) { var sv = cell(row, status, 20).toUpperCase(); if (/^(INACTIVE|NO|N|FALSE|0)$/.test(sv)) x.inactive = true; else if (/^(ACTIVE|YES|Y|TRUE|1)$/.test(sv)) x.inactive = false; }
         if (check >= 0) { x.check = cell(row, check, 60); x.checkNote = cell(row, note, 300); x.gpsFrom = cell(row, from, 80); x.proposed = cell(row, changed, 40).toUpperCase() === 'YES' ? cell(row, prop, 200) : ''; }
         out.push(x);
       }
@@ -436,7 +437,7 @@
   }
 
   /**
-   * A sheet of checked ship-to addresses (Customer Address List tab): headings Account, Street (or Ship-to street, Address), City, State, Zip,
+   * A sheet of checked ship-to addresses (Master Customer List): headings Account, Street (or Ship-to street, Address), City, State, Zip,
    * and if there, Street 2, Confidence and Source. One row per customer; rows with no account or street are skipped.
    */
   function checkedAddressRows(rows) {

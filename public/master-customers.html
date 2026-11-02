@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Master Customer List · Customer List</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/udcl.css">
+  <script src="js/udcl-rules.js"></script>
+</head>
+<!-- Joe 11/2: "I want to customer address list put into the administration tab ... basically a master customer list. It will show
+     all of them", Active or Inactive first, a Sort by box (location, then A to Z) and a sort on every heading. Administrators only. -->
+<body class="fill udcl-page" data-help="master-customers">
+  <div class="signin" id="signin" hidden>
+    <h1>Master Customer List</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow"><a href="administration.html">Administration</a> · <span id="plant-name"></span></span><h1>Master Customer List</h1></div>
+      <div class="actions in-head"><span id="udcl-print-menu"></span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <p class="udcl-help" id="not-admin" hidden>Only an administrator can use the Master Customer List.</p>
+    <div class="view" id="master-view" hidden>
+      <div class="udcl-master">
+        <div class="ml-card">
+          <div class="ml-pick"><b>Upload the master address list</b><input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv" aria-label="Master address list file"><button type="button" class="primary" id="i-addr-go">Upload</button></div>
+          <div id="i-msg"></div>
+          <div class="ml-stats" id="card-stats"></div>
+          <div class="ml-last" id="card-last"></div>
+          <details><summary>What an upload changes</summary><ul>
+            <li>The file needs <b>DC, Chain, Account, Customer</b> and the street, city, state and ZIP. <b>Status</b> (Active or Inactive), <b>Latitude, Longitude, Phone, Contact, Group, Match status, Matched address</b> and <b>Coordinate source</b> are read when they are there.</li>
+            <li><b>Changes</b> each customer's name, chain, distribution center and address, and the GPS, phone, contact, group and status the file has. <b>Adds</b> a customer the list does not have yet (with no route).</li>
+            <li><b>Keeps</b> routes, run and load order, notes, keys, anything the file leaves blank, and a checked ship-to address. A PO box, mailbox or c/o never replaces a street.</li>
+            <li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li>
+            <li>A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.</li>
+          </ul></details>
+        </div>
+      </div>
+      <div class="udcl-bar" id="bar">
+        <div class="field"><label for="q">Find</label><input type="search" id="q" placeholder="Name, account, city, ZIP, phone"></div>
+        <div class="field"><label for="sort">Sort by</label><select id="sort">
+          <option value="location">Location, then A to Z</option><option value="name">Customer name, A to Z</option><option value="city">City, then A to Z</option><option value="status">Inactive first</option><option value="">The heading you pressed</option>
+        </select></div>
+        <div class="field"><label for="dcpick">Location</label><select id="dcpick"><option value="">All locations</option></select></div>
+        <div class="field"><label for="status">Status</label><select id="status"><option value="">Active and inactive</option><option>Active</option><option>Inactive</option></select></div>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="scroll-list" id="table-wrap">
+        <table class="master-table">
+          <thead id="thead"></thead>
+          <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
+        </table>
+      </div>
+      <div class="footer udcl-foot"><span id="save-msg"></span></div>
+    </div>
+  </div>
+
+  <script type="module">import './js/udcl-master.js';</script>
+</body>
+</html>

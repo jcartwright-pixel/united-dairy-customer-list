@@ -109,7 +109,8 @@ export async function installApp() {
 export const canInstall = () => !!installPrompt;
 
 /* ---------- the header and the menu ---------- */
-const hereHref = () => HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
+// The Master Customer List is part of Administration (Joe 11/2).
+const hereHref = () => HERE === 'master-customers.html' ? 'administration.html' : HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
 function drawFrame() {
   const bar = document.querySelector('#screen > .topbar');
   if (bar && !bar.querySelector('.brand')) {

@@ -13,7 +13,7 @@
     <script src="js/udcl-rules.js"></script>
 </head>
 <!-- Joe 11/1: the United Dairy Customer List (UDCL), the one customer list every app reads. See it by customer, by route or by
-     day, a Directory and the Customer Address List tab where the master address list is uploaded, sort and filter it, change a customer, and print any of it from the Print menu. -->
+     day, and a Directory, sort and filter it, change a customer, and print any of it from the Print menu. -->
 <body class="fill udcl-page" data-help="customers">
   <div class="signin" id="signin" hidden>
     <h1>Customer List</h1>
@@ -34,7 +34,6 @@
         <button type="button" role="tab" data-view="route" aria-selected="false">By Route</button>
         <button type="button" role="tab" data-view="day" aria-selected="false">By Day</button>
         <button type="button" role="tab" data-view="list" aria-selected="false">Directory</button>
-        <button type="button" role="tab" data-view="master" aria-selected="false">Customer Address List</button>
       </div>
       <div class="actions in-head">
         <button type="button" id="add" hidden>+ Add Customer</button>
@@ -44,7 +43,6 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="udcl-master" id="master" hidden></div>
       <div class="udcl-bar" id="bar">
         <div class="field"><label for="q">Find</label><input type="search" id="q" placeholder="Name, account, city, chain"></div>
         <div class="field"><label for="route">Route</label><select id="route"><option value="">All routes</option></select></div>

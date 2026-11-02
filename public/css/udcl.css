@@ -155,7 +155,7 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 /* Joe 11/2: the Directory's Group drop-down. */
 .udcl-page select.grp, .udcl-page input.grp-new { width: 100%; min-height: 32px; font: inherit; padding: 2px 6px; border: 1px solid #c4d0dc; border-radius: 6px; background: #fff; }
 
-/* Joe 11/2 facelift: the Customer Address List tab, the footer, and calmer action buttons. */
+/* Joe 11/2 facelift: the Master Customer List upload card, the footer, and calmer action buttons. */
 .udcl-page th.dayroute, .udcl-page td.dayroute { min-width: 3.2em; padding-left: 2px; padding-right: 2px; }
 .udcl-page .head .actions.in-head { gap: 8px; }
 .udcl-page .head .actions.in-head > button { min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
@@ -185,3 +185,15 @@ body.udcl-page:has(#views [data-view="master"][aria-selected="true"]) #rows td {
 /* Joe 11/2: long lists draw 300 lines at a time. */
 .udcl-page tr.more td { text-align: center; color: var(--muted); padding: 10px; }
 .udcl-page tr.more button { min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+/* The Master Customer List (Joe 11/2): every heading sorts; inactive lines are greyed. */
+.master-table th button.sorter { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.master-table th button.sorter:hover, .master-table th button.sorter:focus-visible { text-decoration: underline; }
+.master-table th button.sorter .arrow { font-size: .8em; }
+.master-table td { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
+.master-table tr.is-inactive td { color: #8a97a5; background: #f5f7f9; }
+.master-table select.status { font: inherit; font-weight: 700; padding: 2px 4px; border-radius: 6px; border: 1px solid #c4d0dc; width: 100%; }
+.master-table select.status.on { color: var(--runs-ink, #146c2e); background: var(--runs-bg, #e6f4ea); }
+.master-table select.status.off { color: #9a4b00; background: #fff4e5; }
+.udcl-page .eyebrow a { color: inherit; }
+.master-table th { white-space: normal; overflow: visible; }
+.master-table th button.sorter { white-space: normal; flex-wrap: wrap; }

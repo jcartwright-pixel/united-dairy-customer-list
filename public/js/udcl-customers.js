@@ -8,7 +8,9 @@ const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.m
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
 
 const params = new URLSearchParams(location.search);
-let data = null, view = ['customer', 'route', 'day', 'list', 'master'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
+// Joe 11/2: the Customer Address List moved to Administration as the Master Customer List.
+if (params.get('view') === 'master') location.replace('master-customers.html');
+let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
 let allLines = [];
 const $ = (id) => document.getElementById(id);
 const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, dc: $('dcpick').value, sort: $('sort').value || view });
@@ -62,27 +64,12 @@ const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]
 
 function draw() {
   document.querySelectorAll('#views button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
-  const master = view === 'master';
-  $('master').hidden = !master;
-  // Route and Day mean nothing on the Directory or the Customer Address List: hide them there.
-  ['route', 'day'].forEach(id => { $(id).closest('.field').hidden = view === 'list' || master; });
+  ['route', 'day'].forEach(id => { $(id).closest('.field').hidden = view === 'list'; });
   if (!data) return;
   const fl = f();
   groupList = groupsNow();
   drawFooter();
-  if (master) {
-    drawMaster();
-    // Joe 11/2: "Put the headers in it": the master file's own headings, one line per customer.
-    const rows = customersShown();
-    $('thead').innerHTML = '<tr>' + addrCols.map(c => '<th' + (c[2] ? '' : ' class="l"') + (c[3] ? ' style="width:' + c[3] + '"' : '') + '>' + e(c[0]) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '">' + addrCols.map(col => {
-      const v = col[1](c);
-      if (col[0] === 'Latitude' && v !== '') return '<td><a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(v) + '</a></td>';
-      return '<td' + (col[2] ? '' : ' class="l"') + (col[4] ? ' title="' + e(v) + '"' : '') + '>' + (col[0] === 'Customer' ? '<b>' + e(v) + '</b>' : col[0] === 'Street' && !v ? '<span class="warnline">No address yet</span>' : e(v)) + '</td>';
-    }).join('') + '</tr>').join('') + moreRow(rows, addrCols.length) ||
-      '<tr><td colspan="' + addrCols.length + '" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
-    $('count').textContent = rows.length.toLocaleString() + ' customer' + (rows.length === 1 ? '' : 's');
-  } else if (view === 'list') {
+  if (view === 'list') {
     const rows = customersShown();
     $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:18%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
     $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
@@ -120,60 +107,7 @@ function drawFooter() {
     (im.counts.noLoadSeq ? ' · <span class="warnline">' + im.counts.noLoadSeq + ' stops have no load sequence yet</span>' : '') + '</span>',
     ms && '<span><b>Master list:</b> ' + e(lastUpload(ms)) + '</span>'].filter(Boolean).join('');
 }
-const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on the Customer Address List tab.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
-
-/* ---------- the Customer Address List tab (Joe 11/2: "one more tab and that's where we're going to upload our master address list";
-   "Customer address list is where this file should be updated into. Put the headers in it.") ---------- */
-const fixed = (v) => v ? Number(v).toFixed(6) : '';
-const addrCols = [['DC', c => U.dcOf(c.dc), 1, '3.5%'], ['Chain', c => c.chain, 1, '3.5%'], ['Account', c => c.account, 1, '5.5%'], ['Customer', c => c.name, 0, '13%', 1],
-  ['Street', c => c.address, 0, '12%', 1], ['Second line', c => c.address2, 0, '6%', 1], ['City', c => c.city, 0, '8%'], ['State', c => c.state, 1, '3.5%'], ['ZIP', c => c.zip, 1, '6%'],
-  ['Latitude', c => c.lat && c.lon ? fixed(c.lat) : '', 1, '6%'], ['Longitude', c => c.lat && c.lon ? fixed(c.lon) : '', 1, '6%'], ['Phone', c => c.phone, 0, '7%'],
-  ['Match status', c => c.addressCheck || '', 0, '9%', 1], ['Matched address', c => c.addressProposed || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '6.5%', 1]];
-let masterFor = null;
-function drawMaster() {
-  if (masterFor === data && $('master').innerHTML) return;   // keep the picked file while the boxes narrow the list
-  masterFor = data;
-  const all = Object.values(data.customers), n = (fn) => all.filter(fn).length;
-  const stat = (num, label, warn) => '<span class="ml-stat' + (warn && num ? ' warn' : '') + '"><b>' + num.toLocaleString() + '</b> ' + e(label) + '</span>';
-  const ms = data.master, as = data.addressSheet;
-  const last = (m, what) => m ? '<span>Last ' + what + ': <b>' + e(m.fileName || 'a file') + '</b>, ' + e(shortDate(m.at)) + ' by ' + e(m.by) + '</span>' : '';
-  $('master').innerHTML = '<div class="ml-card">' +
-    (data.canImport ? '<div class="ml-pick"><b>Upload the master address list</b><input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv" aria-label="Master address list file"><button type="button" class="primary" id="i-addr-go">Upload</button></div><div id="i-msg"></div>'
-      : '<p class="deliveries">An administrator uploads the master address list.</p>') +
-    '<div class="ml-stats">' + stat(all.length, 'customers') + stat(n(c => c.lat && c.lon), 'with GPS') + stat(n(c => c.phone), 'with a phone') + stat(n(c => !U.addressLine(c)), 'with no address yet', true) + '</div>' +
-    '<div class="ml-last">' + [last(ms, 'master list'), last(as, 'checked addresses')].filter(Boolean).join(' · ') + '</div>' +
-    '<details><summary>What an upload changes</summary><ul>' +
-    '<li>The file needs <b>DC, Chain, Account, Customer</b> and the street, city, state and ZIP. <b>Latitude, Longitude, Phone, Contact, Group, Match status, Matched address</b> and <b>Coordinate source</b> are read when they are there.</li>' +
-    '<li><b>Changes</b> each customer\'s name, chain, distribution center and address, and the GPS, phone, contact and group the file has. <b>Adds</b> a customer the list does not have yet (with no route).</li>' +
-    '<li><b>Keeps</b> routes, run and load order, notes, keys, any phone or group the file leaves blank, and a checked ship-to address. A PO box, mailbox or c/o never replaces a street.</li>' +
-    '<li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li>' +
-    '<li>A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.</li></ul></details></div>';
-  if (data.canImport) $('i-addr-go').onclick = uploadMaster;
-}
-async function uploadMaster() {
-  const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
-  const file = $('i-addr').files[0];
-  if (!file) return say('Pick the master list file first.', 'bad');
-  const btn = $('i-addr-go'); btn.disabled = true;
-  try {
-    say('Reading ' + file.name + '…');
-    const X = await loadXlsx(), wb = X.read(await file.arrayBuffer(), { type: 'array' });
-    let full = [];
-    wb.SheetNames.some(n => (full = U.fullListRows(sheetRows(X, wb, n))).length);
-    if (full.length) {
-      say('Saving ' + full.length.toLocaleString() + ' customers from the master list. This can take a minute…');
-      const out = await saveStep('importFullList', { rows: full, fileName: file.name, thenView: true });
-      setData(out); return say(out.message, 'good');
-    }
-    let rows = [];
-    wb.SheetNames.some(n => (rows = U.checkedAddressRows(sheetRows(X, wb, n))).length);
-    if (!rows.length) return say('No sheet with DC, Account and Customer headings (the master list) or Account, Street and City headings (checked addresses) was found in ' + file.name + '.', 'bad');
-    say('Saving ' + rows.length + ' checked addresses…');
-    const out = await saveStep('importAddresses', { rows, fileName: file.name, thenView: true });
-    setData(out); say(out.message, 'good');
-  } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
-  finally { if ($('i-addr-go')) $('i-addr-go').disabled = false; }
-}
+const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Administration, Master Customer List.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
 
 /* ---------- a customer's card ---------- */
 function panel(title, body) {
@@ -230,7 +164,7 @@ function openImport() {
     '<label>Route Menu workbook (.xlsb, .xlsx)<input type="file" id="i-menu" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<button type="button" class="primary" id="i-go">Upload</button><div id="i-msg"></div>' +
-    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on the <b>Customer Address List</b> tab.</p><hr>' +
+    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on <b>Administration</b>, <b>Master Customer List</b>.</p><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
@@ -242,7 +176,7 @@ function openImport() {
       const X = await loadXlsx(), wb = X.read(await mf.arrayBuffer(), { type: 'array' });
       const tab = findSheet(wb, 'Customer By Route');
       const menu = tab ? U.menuStops(sheetRows(X, wb, tab)) : null;
-      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on the Customer Address List tab.', 'bad');
+      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on Administration, Master Customer List.', 'bad');
       const accounts = new Set(menu.stops.concat(menu.unrouted).map(s => s.account).filter(Boolean)), names = new Set(menu.stops.concat(menu.unrouted).map(s => U.nameKey(s.name)));
       const at = findSheet(wb, 'Address List'), gt = findSheet(wb, 'GPS Address');
       const allAddr = at ? U.addressList(sheetRows(X, wb, at)) : {}, allGps = gt ? U.gpsAddresses(sheetRows(X, wb, gt)) : {};
@@ -270,9 +204,7 @@ function printItems() {
   const lineCols = [['Day', l => dayName(l.day).slice(0, 3), 1], ['Route', l => l.route, 1], ['Run Seq', l => l.stop, 1], ['Load Seq', l => l.loadSeq || '', 1], ['Account', l => l.account], ['Customer', l => l.name], ['Address', l => U.addressLine(l)], ['Note', l => l.note]];
   const rds = sortedRouteDays(data.routeDays).filter(rd => (!fl.route || rd.route === fl.route) && (!fl.day || rd.day === fl.day));
   return [
-    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'master'
-      ? printDoc('Customer address list', [tablePage('Customer address list · ' + pn, filt || 'All customers', customersShown(), addrCols.filter(c => !/Matched|Coordinate/.test(c[0])).map(c => [c[0], c[1], c[2]]))])
-      : view === 'list'
+    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'list'
       ? printDoc('Customer directory', [tablePage('Customer directory · ' + pn, filt || 'All customers', customersShown(), dirCols)])
       : view === 'customer'
       ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])

@@ -8,8 +8,8 @@ import { callServer, escapeHtml as e, printInFrame, shortDate, showPlant, setPla
 const U = window.UDCL;
 
 /** The plant's list: { customers, routeDays, canEdit, canImport, imported, plantName }. */
-export async function readList() {
-  const d = await callServer('customerList', { op: 'view' });
+export async function readList(extra) {
+  const d = await callServer('customerList', Object.assign({ op: 'view' }, extra || {}));
   showPlant(d.plantName);
   // Administration (in the menu, and the kiosk's one button) shows only to administrators; the server checks again.
   document.body.classList.toggle('is-admin', !!d.canImport);
