@@ -197,3 +197,9 @@ body.udcl-page:has(#views [data-view="master"][aria-selected="true"]) #rows td {
 .udcl-page .eyebrow a { color: inherit; }
 .master-table th { white-space: normal; overflow: visible; }
 .master-table th button.sorter { white-space: normal; flex-wrap: wrap; }
+/* Joe 11/2: the screen shows all at once when its list is in (shell.js requireSignIn); until then only the header, the menu and
+   one "Reading" line. visibility keeps every box in its place, so nothing moves when it shows. */
+body.waiting #screen > :not(.topbar):not(.udcl-nav):not(.notice):not(.update-ready):not(.screen-loading) { visibility: hidden; }
+.screen-loading { display: none; }
+body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 0; top: 45%; text-align: center; font-size: 20px; font-weight: 700; color: var(--muted); }
+.master-table { table-layout: fixed; }

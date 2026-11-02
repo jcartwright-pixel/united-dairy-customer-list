@@ -112,6 +112,10 @@ export const canInstall = () => !!installPrompt;
 // The Master Customer List is part of Administration (Joe 11/2).
 const hereHref = () => HERE === 'master-customers.html' ? 'administration.html' : HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
 function drawFrame() {
+  // Joe 11/2: nothing pops in late. Administration shows at once for whoever was an administrator last time (the server checks
+  // again), and the screen under the menu stays hidden, with one "Reading" line, until its list is in and drawn: then it all
+  // shows together (requireSignIn).
+  try { document.body.classList.toggle('is-admin', localStorage.getItem('udcl.admin') === '1'); } catch (e) { /* no storage */ }
   const bar = document.querySelector('#screen > .topbar');
   if (bar && !bar.querySelector('.brand')) {
     const brand = document.createElement('a');
@@ -134,11 +138,17 @@ function drawFrame() {
     nav.innerHTML = SCREENS.filter(s => s.href !== 'help.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + (s.href === hereHref() ? ' aria-current="page"' : '') + '>' + escapeHtml(s.name) + '</a>').join('');
     bar.insertAdjacentElement('afterend', nav);
   }
+  if (screen && !document.getElementById('screen-loading')) {
+    const wait = document.createElement('div');
+    wait.id = 'screen-loading'; wait.className = 'screen-loading'; wait.setAttribute('role', 'status'); wait.textContent = 'Reading the customer list…';
+    screen.appendChild(wait);
+  }
 }
 export function showPlant(name) { const el = document.getElementById('bar-plant'); if (el) el.textContent = name ? String(name).toUpperCase() : ''; }
 
 /** Shows the screen once someone with a United Dairy account is signed in; ready(user) then reads the list. */
 export async function requireSignIn(ready) {
+  document.body.classList.add('waiting');
   drawFrame();
   const gate = document.getElementById('signin'), screen = document.getElementById('screen');
   const { auth } = await start();
@@ -157,7 +167,7 @@ export async function requireSignIn(ready) {
       who.textContent = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || email).slice(0, 2)).toUpperCase();
       who.title = email; who.classList.add('initials');
     }
-    ready(user);
+    try { await ready(user); } finally { document.body.classList.remove('waiting'); }
   });
   const btn = document.getElementById('signin-button');
   if (btn) btn.addEventListener('click', async () => {

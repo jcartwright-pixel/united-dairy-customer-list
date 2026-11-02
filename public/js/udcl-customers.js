@@ -11,7 +11,9 @@ const params = new URLSearchParams(location.search);
 // Joe 11/2: the Customer Address List moved to Administration as the Master Customer List.
 if (params.get('view') === 'master') location.replace('master-customers.html');
 let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
-let allLines = [];
+// Worked out once each time the list changes (rebuild), not at every click: the lines, and one row per customer with its deliveries
+// and the text Find looks in.
+let allLines = [], allCustomers = [];
 const $ = (id) => document.getElementById(id);
 const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, dc: $('dcpick').value, sort: $('sort').value || view });
 const dayName = (d) => U.DAY_NAMES[d] || d;
@@ -32,12 +34,12 @@ function customersShown() {
   const fl = f(), lines = U.pick(allLines, Object.assign({}, fl, { sort: 'customer' }));
   const keys = new Set(lines.map(l => l.key));
   const words = U.text(fl.q).toUpperCase().split(' ').filter(Boolean);
-  const rows = U.customerRows(data.customers, allLines).filter(c => (keys.has(c.key) || (!fl.route && !fl.day && (!fl.chain || c.chain === fl.chain) && !(c.deliveries || []).length &&
-    words.every(w => [c.name, c.account, c.city, c.chain, c.group, c.address, U.dcName(c.dc)].join(' ').toUpperCase().indexOf(w) >= 0))) && (!fl.dc || U.dcOf(c.dc) === fl.dc));
+  const rows = allCustomers.filter(c => (keys.has(c.key) || (!fl.route && !fl.day && (!fl.chain || c.chain === fl.chain) && !c.deliveries.length &&
+    words.every(w => c.findText.indexOf(w) >= 0))) && (!fl.dc || U.dcOf(c.dc) === fl.dc));
   const s = fl.sort === 'customer' || !U.SORTS[fl.sort] ? null : fl.sort;
   if (s === 'account') rows.sort((a, b) => U.byRoute(a.account, b.account));
-  else if (s === 'city') rows.sort((a, b) => String(a.city).localeCompare(String(b.city)) || a.name.localeCompare(b.name));
-  else if (s === 'chain') rows.sort((a, b) => U.byRoute(a.chain || 'zz', b.chain || 'zz') || a.name.localeCompare(b.name));
+  else if (s === 'city') rows.sort((a, b) => U.byName(a.city, b.city) || U.byName(a.name, b.name));
+  else if (s === 'chain') rows.sort((a, b) => U.byRoute(a.chain || 'zz', b.chain || 'zz') || U.byName(a.name, b.name));
   else if (s === 'route' || s === 'day') rows.sort((a, b) => { const x = (a.deliveries || [])[0] || {}, y = (b.deliveries || [])[0] || {}; return s === 'route' ? U.byRoute(x.route || 'zz', y.route || 'zz') || U.dayIndex(x.day) - U.dayIndex(y.day) : U.dayIndex(x.day) - U.dayIndex(y.day) || U.byRoute(x.route || 'zz', y.route || 'zz'); });
   return rows;
 }
@@ -46,7 +48,7 @@ function customersShown() {
 const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
 // Joe 11/2: a Group column on the Directory, picked from a drop-down, with a new group added from the same list.
-const groupsNow = () => [...new Set(Object.values(data.customers).map(c => c.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+const groupsNow = () => [...new Set(Object.values(data.customers).map(c => c.group).filter(Boolean))].sort(U.byName);
 // The group list is worked out once per drawing (Joe 11/2: with 5,118 customers, once per line made the screen crawl).
 let groupList = [];
 const groupCell = (c) => !data.canEdit ? e(c.group || '') : '<select class="grp" data-key="' + e(c.key) + '" aria-label="Group for ' + e(c.name) + '"><option value="">No group</option>' +
@@ -217,7 +219,12 @@ function printItems() {
   ];
 }
 
-function rebuild() { allLines = U.lines(data.customers, data.routeDays); fillPickers(); draw(); }
+function rebuild() {
+  allLines = U.lines(data.customers, data.routeDays);
+  allCustomers = U.customerRows(data.customers, allLines);
+  allCustomers.forEach(c => { c.findText = [c.name, c.account, c.city, c.chain, c.group, c.address, U.dcName(c.dc)].join(' ').toUpperCase(); });
+  fillPickers(); draw();
+}
 function setData(d) {
   data = Object.assign({}, data || {}, d);
   $('plant-name').textContent = data.plantName || '';

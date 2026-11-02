@@ -13,6 +13,7 @@ export async function readList(extra) {
   showPlant(d.plantName);
   // Administration (in the menu, and the kiosk's one button) shows only to administrators; the server checks again.
   document.body.classList.toggle('is-admin', !!d.canImport);
+  try { localStorage.setItem('udcl.admin', d.canImport ? '1' : '0'); } catch (e) { /* no storage */ }
   // Someone set up for more than one plant picks the plant in the header; the list is that plant's.
   const bar = document.querySelector('#screen > .topbar');
   if (bar && (d.plants || []).length > 1 && !document.getElementById('plant-pick')) {

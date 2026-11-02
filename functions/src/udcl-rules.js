@@ -61,7 +61,11 @@
   function routeDayId(plant, route, day) { return safe(plant) + '__' + safe(route) + '__' + day; }
   function customerId(plant, key) { return safe(plant) + '__' + safe(key); }
   function safe(v) { return String(v || '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 60); }
-  function byRoute(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }
+  // One shared collator: String.localeCompare with options builds a new one at every call, which made sorting 5,118 customers
+  // take about a second (Joe 11/2: "everything's extremely slow").
+  var NUMERIC = new Intl.Collator('en', { numeric: true }), NAMES = new Intl.Collator('en');
+  function byRoute(a, b) { return NUMERIC.compare(String(a), String(b)); }
+  function byName(a, b) { return NAMES.compare(String(a === null || a === undefined ? '' : a), String(b === null || b === undefined ? '' : b)); }
   function dayIndex(d) { var i = DAYS.indexOf(d); return i < 0 ? 9 : i; }
 
   /* ---------- reading the workbooks (rows = arrays of cell values, as SheetJS sheet_to_json(header: 1) gives) ---------- */
@@ -194,21 +198,21 @@
     if (hasRun && hasRun * 2 >= list.length) {
       return list.sort(function (a, b) {
         var ra = run[a.key] || 999, rb = run[b.key] || 999;
-        return ra - rb || b.loadSeq - a.loadSeq || a.name.localeCompare(b.name);
+        return ra - rb || b.loadSeq - a.loadSeq || byName(a.name, b.name);
       });
     }
     if (saved && saved.length) {
       var at = {};
       saved.forEach(function (k, i) { at[k] = i; });
       var kept = list.filter(function (s) { return at[s.key] !== undefined; }).sort(function (a, b) { return at[a.key] - at[b.key]; });
-      list.filter(function (s) { return at[s.key] === undefined; }).sort(function (a, b) { return b.loadSeq - a.loadSeq || a.name.localeCompare(b.name); }).forEach(function (s) {
+      list.filter(function (s) { return at[s.key] === undefined; }).sort(function (a, b) { return b.loadSeq - a.loadSeq || byName(a.name, b.name); }).forEach(function (s) {
         var i = 0;
         while (i < kept.length && kept[i].loadSeq >= s.loadSeq) i++;
         kept.splice(i, 0, s);
       });
       return kept;
     }
-    return list.sort(function (a, b) { return b.loadSeq - a.loadSeq || a.name.localeCompare(b.name); });
+    return list.sort(function (a, b) { return b.loadSeq - a.loadSeq || byName(a.name, b.name); });
   }
 
   /** The load sequence numbers on a route day, smallest first. */
@@ -304,12 +308,12 @@
   }
 
   var SORTS = {
-    customer: function (a, b) { return a.name.localeCompare(b.name) || dayIndex(a.day) - dayIndex(b.day) || byRoute(a.route, b.route); },
+    customer: function (a, b) { return byName(a.name, b.name) || dayIndex(a.day) - dayIndex(b.day) || byRoute(a.route, b.route); },
     route: function (a, b) { return byRoute(a.route, b.route) || dayIndex(a.day) - dayIndex(b.day) || a.stop - b.stop; },
     day: function (a, b) { return dayIndex(a.day) - dayIndex(b.day) || byRoute(a.route, b.route) || a.stop - b.stop; },
     account: function (a, b) { return byRoute(a.account, b.account) || dayIndex(a.day) - dayIndex(b.day); },
-    city: function (a, b) { return a.city.localeCompare(b.city) || a.name.localeCompare(b.name) || dayIndex(a.day) - dayIndex(b.day); },
-    chain: function (a, b) { return byRoute(a.chain || 'zz', b.chain || 'zz') || a.name.localeCompare(b.name) || dayIndex(a.day) - dayIndex(b.day); }
+    city: function (a, b) { return byName(a.city, b.city) || byName(a.name, b.name) || dayIndex(a.day) - dayIndex(b.day); },
+    chain: function (a, b) { return byRoute(a.chain || 'zz', b.chain || 'zz') || byName(a.name, b.name) || dayIndex(a.day) - dayIndex(b.day); }
   };
 
   /** The lines picked by the screen's boxes: f = { q (any words), route, day, chain, sort }. */
@@ -335,7 +339,7 @@
       var c = customers[k], ls = (by[k] || []).sort(SORTS.day);
       return Object.assign({}, c, { key: k, deliveries: ls.map(function (l) { return { day: l.day, route: l.route, stop: l.stop, loadSeq: l.loadSeq }; }),
         days: ls.map(function (l) { return l.day; }).filter(function (d, i, a) { return a.indexOf(d) === i; }) });
-    }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    }).sort(function (a, b) { return byName(a.name, b.name); });
   }
 
   /** "S M T W H F S" with the delivery days filled in, as the Route Menu writes it. */
@@ -472,7 +476,7 @@
 
   return { mapFits: mapFits, DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
     CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
-    routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
+    routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, byName: byName, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
     lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, ADDRESS_FIELDS: ADDRESS_FIELDS };
