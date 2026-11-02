@@ -23,7 +23,7 @@ screens: customers.html
 
 The **United Dairy Customer List** (UDCL): the one list of every customer, the routes and days they get a delivery, and in what order. The Sales app and the drivers' route book read it from here. Each plant keeps its own list (Uniontown first).
 
-1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order) or `By Day` (each day with its routes).
+1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, account, name, address, GPS and phone; the GPS opens the spot in Google Maps).
 2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** and **Chain**. **Sort by** changes the order.
 3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
 4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.

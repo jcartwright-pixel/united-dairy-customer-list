@@ -8,7 +8,7 @@ const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.m
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
 
 const params = new URLSearchParams(location.search);
-let data = null, view = ['customer', 'route', 'day'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
+let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
 let allLines = [];
 const $ = (id) => document.getElementById(id);
 const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, sort: $('sort').value || view });
@@ -41,13 +41,24 @@ function customersShown() {
 // holding the route that delivers that day, with no stop number.
 const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
+// Joe 11/2: the Directory tab, "just ... the customer list with the addresses and the GPS coordinates ... and the phone numbers. Not the routes".
+const gpsText = (c) => (c.lat && c.lon) ? Number(c.lat).toFixed(5) + ', ' + Number(c.lon).toFixed(5) : '';
+const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone]];
 const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]);
 
 function draw() {
   document.querySelectorAll('#views button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
   if (!data) return;
   const fl = f();
-  if (view === 'customer') {
+  if (view === 'list') {
+    const rows = customersShown();
+    $('thead').innerHTML = '<tr><th style="width:8%">DC</th><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:22%">Customer</th><th class="l">Address</th><th style="width:14%">GPS</th><th class="l" style="width:11%">Phone</th></tr>';
+    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
+      '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
+      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td></tr>').join('') ||
+      '<tr><td colspan="7" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+    $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
+  } else if (view === 'customer') {
     const rows = customersShown();
     $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:19%">Customer</th><th style="width:8%">DC</th><th class="l">Address</th>' +
       U.DAYS.map(d => '<th class="dayroute" style="width:4.95%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
@@ -193,7 +204,9 @@ function printItems() {
   const lineCols = [['Day', l => dayName(l.day).slice(0, 3), 1], ['Route', l => l.route, 1], ['Run Seq', l => l.stop, 1], ['Load Seq', l => l.loadSeq || '', 1], ['Account', l => l.account], ['Customer', l => l.name], ['Address', l => U.addressLine(l)], ['Note', l => l.note]];
   const rds = sortedRouteDays(data.routeDays).filter(rd => (!fl.route || rd.route === fl.route) && (!fl.day || rd.day === fl.day));
   return [
-    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'customer'
+    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'list'
+      ? printDoc('Customer directory', [tablePage('Customer directory · ' + pn, filt || 'All customers', customersShown(), dirCols)])
+      : view === 'customer'
       ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])
       : printDoc('Deliveries', [tablePage('Deliveries · ' + pn, filt || 'All deliveries', U.pick(allLines, fl), lineCols, view === 'route' ? (l => 'Route ' + l.route + ' · ' + dayName(l.day)) : (l => dayName(l.day) + ' · Route ' + l.route))]) },
     { label: 'Route sequence sheets for the office', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + (filt ? ' (' + filt + ')' : '') + ', one page each', html: () => printDoc('Route sequence', rds.map(rd => routeDayPage(rd, data.customers, 'office', pn))) },

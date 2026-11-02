@@ -78,6 +78,15 @@ async function ph0(browser) {
     await p.selectOption('#route', '');
     await p.selectOption('#day', 'TUE');
     assert.equal(await p.textContent('#count'), '5 deliveries');
+    // Joe 11/2: the Directory tab: no routes, with GPS and phone.
+    await p.click('#views [data-view="list"]');
+    await p.selectOption('#day', '');
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Account', 'Customer', 'Address', 'GPS', 'Phone']);
+    assert.equal(await p.textContent('#count'), '9 customers');
+    assert.match(await p.textContent('#rows tr[data-key="1196"]'), /Uniontown.*1196.*12 ELM ST, MAPLETON, PA 15401/);
+    await shot(p, 'udcl-1920-directory');
+    await p.click('#views [data-view="day"]');
+    await p.selectOption('#day', 'TUE');
     await p.click('#rows tr[data-key="40463"]');
     await p.waitForSelector('#panel');
     await p.fill('#c-phone', '555-0100');
