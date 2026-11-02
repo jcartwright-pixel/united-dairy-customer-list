@@ -7,8 +7,9 @@ name: Load Addresses (Customer List)
 # prints its public half. A push to main that changes an address file loads it into production by itself.
 on:
   push:
-    branches: [main]
-    paths: ['data/addresses.*.enc.json']
+    # main loads production; a claude/ branch loads the sandbox (Claude's testing, Joe 11/2).
+    branches: [main, 'claude/**']
+    paths: ['data/addresses.*.enc.json', '.github/workflows/load-addresses.yml', 'functions/scripts/load-addresses.js']
   workflow_dispatch:
     inputs:
       target:
@@ -28,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: load-addresses-${{ inputs.target || 'production' }}
+  group: load-addresses-${{ inputs.target || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +45,7 @@ jobs:
         env:
           SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
           SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
-          TARGET: ${{ inputs.target || 'production' }}
+          TARGET: ${{ inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'sandbox') }}
           REF: ${{ github.ref }}
         shell: bash
         run: |
