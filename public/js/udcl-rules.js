@@ -390,6 +390,32 @@
   }
 
   /**
+   * Joe 11/2: the company's full customer list, every distribution center: headings DC, CHAIN, ACCOUNT, NAME, then the street, a
+   * second street (often the same again), city, state and zip, with or without headings of their own. Chain 0 is chain 0.
+   * One row per customer: { dc, chain, account, name, address, address2, city, state, zip }; rows with no account are skipped.
+   */
+  function fullListRows(rows) {
+    rows = rows || [];
+    for (var r = 0; r < Math.min(rows.length, 20); r++) {
+      var cells = (rows[r] || []).map(function (c) { return text(c).toUpperCase(); });
+      var dc = cells.indexOf('DC'), acct = cells.indexOf('ACCOUNT'), name = cells.indexOf('NAME'), chain = cells.indexOf('CHAIN');
+      if (dc < 0 || acct < 0 || name < 0) continue;
+      var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt; };
+      var a1 = at(['ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1'], name + 1), a2 = at(['ADDRESS 2', 'STREET 2'], name + 2), city = at(['CITY'], name + 3), st = at(['STATE', 'ST'], name + 4), zip = at(['ZIP', 'ZIP CODE'], name + 5);
+      var out = [];
+      for (var i = r + 1; i < rows.length; i++) {
+        var row = rows[i] || [], account = numText(row[acct], LIMITS.account), nm = text(row[name], LIMITS.name);
+        if (!account || !nm) continue;
+        var s1 = text(row[a1], LIMITS.address), s2 = text(row[a2], LIMITS.address);
+        out.push({ dc: numText(row[dc], 6).replace(/^0+(?=\d)/, ''), chain: chain >= 0 ? numText(row[chain], LIMITS.chain) : '', account: account, name: nm, address: s1, address2: s2 && s2.toUpperCase() !== s1.toUpperCase() ? s2 : '',
+          city: text(row[city], LIMITS.city), state: text(row[st], LIMITS.state).toUpperCase(), zip: numText(row[zip], LIMITS.zip) });
+      }
+      return out;
+    }
+    return [];
+  }
+
+  /**
    * A sheet of checked ship-to addresses (Import Addresses): headings Account, Street (or Ship-to street, Address), City, State, Zip,
    * and if there, Street 2, Confidence and Source. One row per customer; rows with no account or street are skipped.
    */
@@ -425,5 +451,5 @@
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
-    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, ADDRESS_FIELDS: ADDRESS_FIELDS };
+    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, ADDRESS_FIELDS: ADDRESS_FIELDS };
 });

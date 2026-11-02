@@ -326,3 +326,33 @@ test('Import Addresses reads a sheet of checked addresses by its headings; only 
   assert.equal(out.counts.changed, 1);
   assert.match(out.message, /stay through the next Route Menu upload/);
 });
+
+test('Joe 11/2: the company full list adds missing customers of this plant\'s DC, fills chain and address, keeps routes and checked addresses', async () => {
+  // Made-up rows: headings DC, CHAIN, ACCOUNT, NAME then headerless street, street again, city, state, zip.
+  const rows = U.fullListRows([
+    ['DC', 'CHAIN', 'ACCOUNT', 'NAME', null, null, null, null, null],
+    [1, 0, 5001, 'OTHER DC STORE', '9 FAR RD', '9 FAR RD', 'FARTOWN', 'OH ', 43950],
+    [30, 0, 5001, 'ACME MARKET', 'PO BOX 12', 'PO BOX 12', 'TOWN', 'PA', 15401],
+    [30, 415, 5002, 'BEST FOODS #2', '22 OAK AVE', '22 OAK AVE', 'MAPLETON', 'pa', 15401],
+    [30, 0, 7777, 'NEW CORNER SHOP', '5 ELM ST', 'SUITE 2', 'MAPLETON', 'PA', '15401']
+  ]);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows[3], { dc: '30', chain: '0', account: '7777', name: 'NEW CORNER SHOP', address: '5 ELM ST', address2: 'SUITE 2', city: 'MAPLETON', state: 'PA', zip: '15401' });
+  assert.equal(rows[2].address2, '', 'the same street twice is one street');
+  const { db } = await imported();
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importFullList', rows }), /Only an administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows }, now);
+  assert.deepEqual([out.counts.read, out.counts.added, out.counts.otherDc], [3, 1, 1]);
+  let v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.equal(v.customers['7777'].name, 'NEW CORNER SHOP');
+  assert.equal(v.customers['7777'].chain, '0');
+  assert.equal(v.customers['7777'].dc, '30');
+  assert.equal(v.customers['5001'].address, '1 MAIN ST', 'a PO box never replaces a street');
+  assert.equal(v.customers['5002'].address, '22 OAK AVE');
+  assert.ok(v.routeDays.some(rd => (rd.stops || []).some(s => s.key === '5002')), 'routes are kept');
+  // The next Route Menu upload does not mark a full-list customer with no route as gone.
+  const m = U.menuStops(MENU);
+  await S.udclCall(db, boss, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted, addresses: {}, gps: {}, book: {}, fileName: 'menu.xlsb' }, now);
+  v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.notEqual(v.customers['7777'].active, false);
+});

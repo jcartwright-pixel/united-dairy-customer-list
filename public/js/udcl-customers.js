@@ -130,7 +130,8 @@ function openImport() {
     '<button type="button" class="primary" id="i-go">Read and import</button><div id="i-msg"></div><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button>' +
     '<p><b>Checked ship-to addresses</b>: a sheet with Account, Street, City, State and Zip headings (addresses looked up by the store\'s name, never a PO box). They replace the addresses here and stay through the next Route Menu upload.</p>' +
-    '<label>Addresses sheet (.xlsx, .csv)<input type="file" id="i-addr" accept=".xlsx,.xls,.csv"></label><button type="button" id="i-addr-go">Import Addresses</button><hr>' +
+    '<p><b>The company\'s full customer list</b> (DC, Chain, Account, Name, address, city, state, zip) goes in with the same button: a customer missing here is added with no route yet, and the others get their chain and address filled in. Only this plant\'s distribution center is read.</p>' +
+    '<label>Addresses sheet or full customer list (.xlsx, .csv, .txt)<input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv"></label><button type="button" id="i-addr-go">Import Addresses</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
   $('i-go').onclick = async () => {
@@ -163,6 +164,15 @@ function openImport() {
     try {
       say('Reading ' + f.name + '…');
       const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
+      // Joe 11/2: the company's full customer list (DC, CHAIN, ACCOUNT, NAME ...) goes in through the same button: missing customers are added.
+      let full = [];
+      wb.SheetNames.some(n => (full = U.fullListRows(sheetRows(X, wb, n))).length);
+      if (full.length) {
+        say('Reading ' + full.length + ' customers from the full list…');
+        const out = await saveStep('importFullList', { rows: full, fileName: f.name, thenView: true });
+        setData(out);
+        return say(out.message, 'good');
+      }
       let rows = [];
       wb.SheetNames.some(n => (rows = U.checkedAddressRows(sheetRows(X, wb, n))).length);
       if (!rows.length) return say('No sheet with Account, Street and City headings was found in ' + f.name + '.', 'bad');
