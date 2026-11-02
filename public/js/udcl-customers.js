@@ -49,8 +49,8 @@ function draw() {
   const fl = f();
   if (view === 'customer') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:23%">Customer</th><th style="width:8%">DC</th><th class="l">Address</th>' +
-      U.DAYS.map(d => '<th class="dayroute" style="width:5.5%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
+    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:19%">Customer</th><th style="width:8%">DC</th><th class="l">Address</th>' +
+      U.DAYS.map(d => '<th class="dayroute" style="width:4.95%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
     $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
       U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') ||
