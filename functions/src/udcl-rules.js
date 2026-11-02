@@ -389,6 +389,30 @@
     return /(\bP\.?\s*O\.?\s*(BOX|BX|DRAWER)\b|\bPOST\s+OFFICE\b|\bMAIL\s*BOX\b|\bPMB\b|\bC\s*\/\s*O\b|\bCARE\s+OF\b|\bR\.?\s*R\.?\s*#?\s*\d+[,\s]+BOX\b|\bR\.?\s*D\.?\s*#?\s*\d*[,\s]+BOX\b|^\s*BOX\s+\d)/i.test(String(a || ''));
   }
 
+  /**
+   * A sheet of checked ship-to addresses (Import Addresses): headings Account, Street (or Ship-to street, Address), City, State, Zip,
+   * and if there, Street 2, Confidence and Source. One row per customer; rows with no account or street are skipped.
+   */
+  function checkedAddressRows(rows) {
+    rows = rows || [];
+    for (var r = 0; r < Math.min(rows.length, 20); r++) {
+      var cells = (rows[r] || []).map(function (c) { return text(c).toUpperCase(); });
+      var col = function (names) { for (var i = 0; i < names.length; i++) { var at = cells.indexOf(names[i]); if (at >= 0) return at; } return -1; };
+      var acct = col(['ACCOUNT', 'ACCT']), street = col(['SHIP-TO STREET', 'SHIP TO STREET', 'STREET', 'ADDRESS']), city = col(['CITY']);
+      if (acct < 0 || street < 0 || city < 0) continue;
+      var st = col(['STATE', 'ST']), zip = col(['ZIP']), s2 = col(['STREET 2', 'ADDRESS 2']), conf = col(['CONFIDENCE']), src = col(['SOURCE', 'WHERE IT CAME FROM']);
+      var out = [];
+      for (var i = r + 1; i < rows.length; i++) {
+        var row = rows[i] || [], key = numText(row[acct], LIMITS.account), a = text(row[street], LIMITS.address);
+        if (!key || !a) continue;
+        out.push({ key: key, address: a, address2: s2 >= 0 ? text(row[s2], LIMITS.address) : '', city: text(row[city], LIMITS.city), state: st >= 0 ? text(row[st], LIMITS.state).toUpperCase() : '',
+          zip: zip >= 0 ? numText(row[zip], LIMITS.zip) : '', confidence: conf >= 0 ? text(row[conf], 20) : '', source: src >= 0 ? text(row[src], 200) : '' });
+      }
+      return out;
+    }
+    return [];
+  }
+
   /** One line of the customer's address, for lists and print. */
   function addressLine(c) {
     c = c || {};
@@ -401,5 +425,5 @@
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
-    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, ADDRESS_FIELDS: ADDRESS_FIELDS };
+    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, ADDRESS_FIELDS: ADDRESS_FIELDS };
 });

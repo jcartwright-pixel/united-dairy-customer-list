@@ -311,7 +311,7 @@ async function routeBook(db, plant, route, day) {
 
 /**
  * Checked ship-to addresses (Joe 11/2: "find the true address ... PO box or mailbox is not a true address"), looked up by the
- * store's name and town, loaded by the Load Addresses workflow (scripts/load-addresses.js), not from a screen. rows:
+ * store's name and town. An Administrator uploads the sheet with Import Addresses on Customers (importAddresses). rows:
  * [{ key, address, address2, city, state, zip, confidence, source }]. Only customers already on the list are changed; each is marked
  * addressChecked so the next Route Menu upload keeps it (importMenu). Returns the counts.
  */
@@ -342,8 +342,15 @@ async function loadAddresses(db, plant, rows, by, stamp) {
   return { changed, same, missing, refused };
 }
 
-const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales };
-const NEEDS = { saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList' };
+async function importAddresses(db, plant, email, input, stamp) {
+  const rows = (Array.isArray(input.rows) ? input.rows : []).slice(0, U.MAX_LINES);
+  if (!rows.length) fail('BAD_REQUEST', 'No addresses were found. The sheet needs Account, Street and City headings.');
+  const c = await loadAddresses(db, plant, rows, email, stamp);
+  return { ok: true, counts: c, message: rows.length + ' addresses read: ' + c.changed + ' changed, ' + c.same + ' already right' + (c.missing ? ', ' + c.missing + ' not on the list' : '') + (c.refused ? ', ' + c.refused + ' left out (a PO box, mailbox or c/o is not a ship-to address)' : '') + '. They stay through the next Route Menu upload.' };
+}
+
+const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses };
+const NEEDS = { saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
