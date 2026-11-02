@@ -24,11 +24,11 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order) or `By Day` (each day with its routes).
 2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** and **Chain**. **Sort by** changes the order.
 3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
-4. In `By Route` and `By Day`, `Open in Route Sequence` on a route's heading opens that route day to change its order.
+4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
 
 ### Buttons
 
-- `+ Add Customer` (Administrators and Managers) adds a customer by account number and name. Then add it to a route day on **Route Sequence**.
+- `+ Add Customer` (Administrators and Managers) adds a customer by account number and name. Then add it to a route day on **Route Book**.
 - `Import Route Menu` (Administrators): pick the **Route Menu** workbook, and the **Route Book** too if you have it, then `Read and import`. The Route Menu's **Customer By Route** tab decides every customer, route, day and load sequence; its **Address List** and **GPS Address** tabs fill in addresses. The Route Book's run order, start times, keys and instructions replace what is here, and so does its truck drawing where the numbers still match. `Bring over the Sales app list` copies the list already uploaded for the Sales app instead.
 - `Print` opens the print menu: this list as shown, the route sequence sheets for the office, the drivers' route book pages, the list by route or by day, or the customers' addresses and phones.
 
@@ -42,14 +42,14 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 !> Do not import an old Route Menu. A route day that is not in the workbook is taken off, and its customers move to not active (shown crossed out).
 
-## Route Sequence
+## Route Book
 id: route-sequence
 screens: route-sequence.html
 
 One route on one day, its stops in the order the driver runs them. This is where the office changes a route's order and prints it.
 
 1. Pick the **Route**, then the **Day** (only the days the route runs can be picked).
-2. Drag a stop up or down to its new place, or use the arrows. **Run Seq** is the run order: the order the driver delivers.
+2. Each line shows **Run Seq**, **Load Seq**, the **Chain**, the **Account** and the **Customer** name. Drag a stop up or down to its new place, or use the arrows. **Run Seq** is the run order: the order the driver delivers.
 3. **Load Seq** is the stop's load sequence: where its product sits on the truck. Load 1 goes on first, at the front; the highest number is at the back door. Type a new number to change it; the truck load map's spots with the old number change to the new one.
 4. **Stop note** is a note for this stop on this day (the customer's own notes, on its card, show on every day).
 5. `Edit` on a stop opens its edit box. On the left: the **Route** and the **Delivery days on this route**. Tick a day to add the stop on that day, untick one to take it off, or pick another route to move it there (the same days stay ticked). The box says what will change. On the right: the **Note for this stop** (this route and day only) and the **Notes for the driver** (every day). Press `Save`. `Take off route …` (press it twice) takes the customer off this route on every day.
@@ -62,7 +62,7 @@ One route on one day, its stops in the order the driver runs them. This is where
 
 > A stop added to a day goes in by its load sequence (after the stops with the same or a higher number). Drag it if it belongs somewhere else.
 
-> After you change a sequence, print the office sheet from the `Print` menu so the office has it. The drivers' phones show the new order at once (**Route Book**). Route Sequence, Truck Load Map and the drivers' Route Book all show the same route days, so a change on one shows on the others.
+> After you change a sequence, print the office sheet from the `Print` menu so the office has it. The drivers' phones show the new order at once. This screen, Truck Load Map and the drivers' phones all show the same route days, so a change on one shows on the others.
 
 !> Do not untick every day by mistake: with no day ticked, `Save` takes the customer off the route.
 
@@ -83,7 +83,7 @@ How the truck is loaded for one route day: the truck seen from above on the left
 7. `Print` opens the print menu: this load map with its customers, every load map for the day, or every day of the route.
 
 - A new route day starts from the 2024 Route Book's drawing when its numbers still match, otherwise it is built from the load sequence.
-- Only an Administrator or Manager can change the order, the load sequence and the map. Every change saves by itself, and shows on Route Sequence and the drivers' Route Book too.
+- Only an Administrator or Manager can change the order, the load sequence and the map. Every change saves by itself, and shows on Route Book and on the drivers' phones too.
 - A new upload of the Route Menu replaces the load sequence, and the Route Book's run order if it is picked.
 
 !> Do not give two different stops' products the same spot by mistake: after changing a load number, check the truck still matches, or press `Rebuild from load sequence`.
@@ -92,13 +92,13 @@ How the truck is loaded for one route day: the truck seen from above on the left
 id: load-map-kiosk
 screens: load-map.html?kiosk=1
 
-The Truck Load Map for the plant's kiosk station: the load diagram on one side and the customers on the other, big enough to read from the dock. Nothing can be changed from it; change the order and load sequence on **Truck Load Map** or **Route Sequence**.
+The Truck Load Map for the plant's kiosk station: the load diagram on one side and the customers on the other, big enough to read from the dock. Nothing can be changed from it; change the order and load sequence on **Truck Load Map** or **Route Book**.
 
 1. An administrator opens it from **Administration** > `Load Map Kiosk`, on the plant's screen, and presses `Full screen`.
 2. Today is picked by itself. Tap a day to look at another.
 3. Tap a route's big button to show its truck and customers.
 
-- It reads the list again every 2 minutes, so a change the office makes on Route Sequence or Truck Load Map shows on the floor by itself.
+- It reads the list again every 2 minutes, so a change the office makes on Route Book or Truck Load Map shows on the floor by itself.
 - `Print` prints this load map for the loader.
 - `Administration` (administrators only) goes back to Administration.
 

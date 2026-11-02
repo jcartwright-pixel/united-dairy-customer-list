@@ -17,7 +17,7 @@ const QS = new URLSearchParams(location.search);
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'The Customer List screens' },
   { href: 'customers.html', name: 'Customers', note: 'Every customer by customer, route or day; sort, filter, print' },
-  { href: 'route-sequence.html', name: 'Route Sequence', note: 'Change a route day\'s run order and print it for the office' },
+  { href: 'route-sequence.html', name: 'Route Book', note: 'Change a route day\'s run order and print it for the office' },
   { href: 'load-map.html', name: 'Truck Load Map', note: 'How the truck is loaded, the customers beside it' },
   { href: 'administration.html', name: 'Administration', note: 'Administrators only: the Load Map Kiosk view and the last import', admin: true },
   { href: 'help.html', name: 'Help', note: 'How each screen works' }

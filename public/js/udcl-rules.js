@@ -345,7 +345,7 @@
 
   /* ---------- checking a save ---------- */
 
-  /** A route day's stops as saved from the Route Sequence screen: in run order, each its customer key, load sequence and note. */
+  /** A route day's stops as saved from the Route Book screen: in run order, each its customer key, load sequence and note. */
   function cleanStops(stops) {
     if (!Array.isArray(stops)) return null;
     var seen = {}, out = [];

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Joe 11/1: the United Dairy Customer List. Customers (by customer, route and day; a customer's card), Route Sequence (move a stop,
+ * Joe 11/1: the United Dairy Customer List. Customers (by customer, route and day; a customer's card), Route Book (move a stop,
  * change a load number), Truck Load Map (paint a spot, type a load sequence, move a line), Administration and the Load Map Kiosk, each with its Print menu. Made-up customers only.
  * Pictures at 1920, 1366 and 390 go to SHOTS_DIR.
  */
@@ -95,10 +95,15 @@ async function ph0(browser) {
     await frame.waitForSelector('.lm-truck');
     assert.match(await frame.textContent('body'), /Route 803 · Tuesday/);
 
-    // Route Sequence: 805 Thursday has the Route Book's run order, start time and instructions; move a stop, change a load.
+    // Route Book: 805 Thursday has the Route Book's run order, start time and instructions; move a stop, change a load.
     const s = await page(browser, EMAIL, { width: 1366, height: 650 });
     await s.goto(s.emailFor('route-sequence.html?route=805&day=THU'));
     await s.waitForSelector('#rows tr[data-drag]');
+    // Joe 11/2: the screen is called Route Book; Chain before Account; the customer's name only (no city).
+    assert.equal(await s.textContent('h1'), 'Route Book');
+    assert.deepEqual((await s.$$eval('#rows thead th, table thead th', x => x.map(t => t.textContent))).slice(0, 5), ['Run Seq', 'Load Seq', 'Chain', 'Account', 'Customer']);
+    assert.equal(await s.textContent('#rows tr[data-drag="40121"] td:nth-child(3)'), '411');
+    assert.equal(await s.textContent('#rows tr[data-drag="40121"] td:nth-child(5)'), 'A PLUS MAPLE #7517');
     assert.deepEqual(await s.$$eval('#rows tr[data-drag]', r => r.map(x => x.dataset.drag)), ['40121', '1707', '13590']);
     assert.equal(await s.inputValue('#start'), '2:30 AM');
     assert.equal(await s.inputValue('#notes'), 'Call the DQ before 6 AM');
@@ -155,7 +160,7 @@ async function ph0(browser) {
     await shot(l, 'udcl-1920-load-map');
     // The kiosk is not in the menu; Administration is, for an administrator.
     const nav = await l.$$eval('#udcl-nav a', a => a.filter(x => x.offsetParent).map(x => x.textContent));
-    assert.deepEqual(nav, ['Home', 'Customers', 'Route Sequence', 'Truck Load Map', 'Administration']);
+    assert.deepEqual(nav, ['Home', 'Customers', 'Route Book', 'Truck Load Map', 'Administration']);
     assert.equal(await v.$$eval('#udcl-nav a', a => a.filter(x => x.offsetParent).map(x => x.textContent).includes('Administration')), false, 'a dispatcher has no Administration');
 
     // Administration: the view-only link to the kiosk.
@@ -179,7 +184,7 @@ async function ph0(browser) {
     assert.equal(await k.$$eval('#udcl-nav', x => x.length), 0, 'and no menu');
     await shot(k, 'udcl-1920-kiosk');
 
-    // Joe 11/2: Route Sequence's Edit box moves a stop to another route; the Load Map window, opened from it, changes it live.
+    // Joe 11/2: Route Book's Edit box moves a stop to another route; the Load Map window, opened from it, changes it live.
     const q = await page(browser, EMAIL);
     await q.goto(q.emailFor('route-sequence.html?route=803&day=TUE'));
     await q.waitForSelector('#rows tr[data-drag="1526"]');

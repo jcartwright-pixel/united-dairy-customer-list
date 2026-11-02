@@ -1,4 +1,4 @@
-// Route Sequence (United Dairy Customer List, Joe 11/1): one route on one day, its stops in the order the driver runs them. An
+// Route Book (United Dairy Customer List, Joe 11/1): one route on one day, its stops in the order the driver runs them. An
 // Administrator or Manager drags a stop to a new place (or uses the arrows), changes its load sequence and note, adds a stop, edits
 // one (its days, its route, its notes, or takes it off: Joe 11/2), and types the start time and instructions; every change saves
 // by itself. Load Map opens the truck in its own window; a change in either window shows in the other. The Print menu prints it for the office, as a
@@ -34,10 +34,10 @@ function draw() {
     const c = data.customers[s.key] || {};
     return '<tr data-drag="' + e(s.key) + '"><td><span class="stopno">' + (i + 1) + '</span></td>' +
       '<td>' + (edit ? '<input class="seq" data-i="' + i + '" inputmode="numeric" value="' + (s.loadSeq || '') + '" aria-label="Load sequence for ' + e(c.name || s.name) + '">' : (s.loadSeq || '-')) + '</td>' +
-      '<td>' + e(c.account || s.account) + '</td><td class="l"><b>' + e(c.name || s.name) + '</b>' + (c.city ? ' <small>' + e(c.city) + '</small>' : '') + '</td>' +
+      '<td>' + e(c.chain || '') + '</td><td>' + e(c.account || s.account) + '</td><td class="l"><b>' + e(c.name || s.name) + '</b></td>' +
       '<td class="l">' + (edit ? '<input class="note" data-i="' + i + '" value="' + e(s.note || '') + '" placeholder="Note for this stop">' : e(s.note || '')) + '</td>' +
       '<td>' + (edit ? '<button type="button" class="mv" data-up="' + i + '" title="Move up"' + (i ? '' : ' disabled') + '>&#9650;</button> <button type="button" class="mv" data-down="' + i + '" title="Move down"' + (i < stops.length - 1 ? '' : ' disabled') + '>&#9660;</button> <button type="button" class="ed" data-ed="' + i + '">Edit</button>' : '') + '</td></tr>';
-  }).join('') || '<tr><td colspan="6" class="empty">' + (data.routeDays.length ? 'No stops on this route day.' : 'The customer list is empty. An administrator imports it on the Customers screen.') + '</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="empty">' + (data.routeDays.length ? 'No stops on this route day.' : 'The customer list is empty. An administrator imports it on the Customers screen.') + '</td></tr>';
   $('start').value = rd ? rd.startTime || '' : ''; $('notes').value = rd ? rd.notes || '' : '';
   $('start').disabled = $('notes').disabled = !edit || !rd;
   $('map').innerHTML = rd ? truckHtml(rd.map, { style: '--lm-w:30px;--lm-h:20px;--lm-f:12px' }) : '';

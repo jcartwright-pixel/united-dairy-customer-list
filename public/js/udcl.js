@@ -1,5 +1,5 @@
 /*
- * United Dairy Customer List (Joe 11/1): what the Customers, Route Sequence and Truck Load Map screens share: reading the list
+ * United Dairy Customer List (Joe 11/1): what the Customers, Route Book and Truck Load Map screens share: reading the list
  * from the server, the Print menu every screen has (Joe: "Be able to print anything from any screen on a drop down"), the
  * printed sheets, and the truck load map drawing. The rules (sorting, run order, load maps) are in udcl-rules.js.
  */
@@ -26,7 +26,7 @@ export async function readList() {
 }
 export async function saveStep(op, fields) { return callServer('customerList', Object.assign({ op }, fields)); }
 
-/* ---------- other windows (Joe 11/2: the Load Map window opened from Route Sequence; an edit in one shows in the other) ---------- */
+/* ---------- other windows (Joe 11/2: the Load Map window opened from Route Book; an edit in one shows in the other) ---------- */
 const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('udcl-changes') : null;
 /** Tells the Customer List's other open windows that a route day changed, so they read the list again. */
 export function announceChange(route, day) { try { if (channel) channel.postMessage({ route, day, at: Date.now() }); } catch (e) { /* no channel */ } }

@@ -209,7 +209,7 @@ test('Joe 11/1: a new upload overrules what was changed here; what the files do 
   assert.equal(after.stops.find(s => s.key === '5001').note, 'Side door', 'a stop note stays');
 });
 
-test('Joe 11/2: Edit on Route Sequence moves a stop to other days and another route, or takes it off', async () => {
+test('Joe 11/2: Edit on Route Book moves a stop to other days and another route, or takes it off', async () => {
   const { db } = await imported();
   const view = () => S.udclCall(db, mgr, PLANT, { op: 'view' });
   const rd = (v, r, d) => v.routeDays.find(x => x.route === r && x.day === d);

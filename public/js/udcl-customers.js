@@ -62,7 +62,7 @@ function draw() {
     $('thead').innerHTML = '<tr><th style="width:8%">Day</th><th style="width:7%">Route</th><th style="width:7%">Run Seq</th><th style="width:7%">Load Seq</th><th style="width:9%">Account</th><th class="l" style="width:24%">Customer</th><th class="l" style="width:16%">City</th><th class="l">Stop note</th></tr>';
     let last = null;
     $('rows').innerHTML = lines.map(l => {
-      const g = grp(l), head = g && g !== last ? '<tr class="group"><td colspan="8" class="l">' + e(g) + ' &nbsp; <a href="route-sequence.html?route=' + encodeURIComponent(l.route) + '&day=' + l.day + '">Open in Route Sequence &rarr;</a></td></tr>' : '';
+      const g = grp(l), head = g && g !== last ? '<tr class="group"><td colspan="8" class="l">' + e(g) + ' &nbsp; <a href="route-sequence.html?route=' + encodeURIComponent(l.route) + '&day=' + l.day + '">Open in Route Book &rarr;</a></td></tr>' : '';
       last = g;
       return head + '<tr class="pick" data-key="' + e(l.key) + '"><td>' + e(dayName(l.day).slice(0, 3)) + '</td><td>' + e(l.route) + '</td><td><span class="stopno">' + l.stop + '</span></td><td>' + (l.loadSeq || '<span class="warnline">-</span>') + '</td><td>' + e(l.account) + '</td><td class="l"><b>' + e(l.name) + '</b></td><td class="l">' + e(l.city) + '</td><td class="l">' + e(l.note) + '</td></tr>';
     }).join('') || '<tr><td colspan="8" class="empty">' + (allLines.length ? 'No delivery matches these boxes.' : emptyText()) + '</td></tr>';
@@ -152,7 +152,7 @@ function openImport() {
       const out = await saveStep('importMenu', { stops: menu.stops, unrouted: menu.unrouted, addresses, gps, book, fileName: mf.name + (bf ? ' + ' + bf.name : ''), thenView: true });
       setData(out);
       const c = out.counts;
-      say(out.message + ' ' + c.added + ' new customers, ' + c.filled + ' had their address or keys filled in, ' + c.inactive + ' no longer on the Route Menu, ' + c.removedDays + ' route days removed.' + (c.noLoadSeq ? ' ' + c.noLoadSeq + ' stops have no load sequence in the Route Menu: give them one on Route Sequence.' : ''), 'good');
+      say(out.message + ' ' + c.added + ' new customers, ' + c.filled + ' had their address or keys filled in, ' + c.inactive + ' no longer on the Route Menu, ' + c.removedDays + ' route days removed.' + (c.noLoadSeq ? ' ' + c.noLoadSeq + ' stops have no load sequence in the Route Menu: give them one on Route Book.' : ''), 'good');
     } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
   };
   $('i-sales').onclick = async () => {

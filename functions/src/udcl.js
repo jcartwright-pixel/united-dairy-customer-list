@@ -105,7 +105,7 @@ async function saveRouteDay(db, plant, email, input, stamp) {
 }
 
 /**
- * Joe 11/2 (Route Sequence, Edit): one customer's place on the routes. Takes it off route `from` on every day not kept, and puts it
+ * Joe 11/2 (Route Book, Edit): one customer's place on the routes. Takes it off route `from` on every day not kept, and puts it
  * on route `route` on each day in `days` (a day the route did not run yet starts a new route day). On a day it is new to, it goes
  * after the last stop with the same or a higher load sequence. `day` (the day being edited) gets `loadSeq` and `note`; a day it is
  * added to takes that load sequence too. days empty = taken off route `from` altogether.

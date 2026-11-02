@@ -10,7 +10,7 @@ import { readList, saveStep, printMenu, printDoc, loadMapPage, truckHtml, sorted
 
 const params = new URLSearchParams(location.search);
 const KIOSK = params.get('kiosk') === '1';
-// Joe 11/2: ?window=1 is the Load Map window Route Sequence opens: the truck, the customers and their load sequence, no menu or notes.
+// Joe 11/2: ?window=1 is the Load Map window Route Book opens: the truck, the customers and their load sequence, no menu or notes.
 const MINI = !KIOSK && params.get('window') === '1';
 if (MINI) document.body.classList.add('udcl-mini');
 let data = null, route = params.get('route') || '', day = U.dayOf(params.get('day')) || (KIOSK ? todayKey() : '');
@@ -170,9 +170,9 @@ async function read() {
 }
 requireSignIn(async () => {
   await read();
-  // Route Sequence, this screen and the drivers' Route Book share one copy: coming back to this tab shows changes made there.
+  // Route Book, this screen and the drivers' Route Book share one copy: coming back to this tab shows changes made there.
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !pending) read(); });
-  // A change saved in Route Sequence (or another window): read the list again at once.
+  // A change saved in Route Book (or another window): read the list again at once.
   onChange(() => { stopSaving.then(() => { if (!pending) read(); }); });
   if (KIOSK) setInterval(() => { if (KIOSK && day !== todayKey() && !params.get('day')) day = todayKey(); read(); }, 120000);
 });
