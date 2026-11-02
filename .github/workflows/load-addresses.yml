@@ -1,0 +1,70 @@
+name: Load Addresses (Customer List)
+
+# Joe 11/2: "push and make that live." Loads checked ship-to addresses (looked up by store name; never a PO box, mailbox or c/o)
+# into the Customer List with the Firebase deploy key, so nobody has to sign in or upload anything. The addresses are in
+# data/addresses.<project>.enc.json, encrypted to a key whose private half is only in the project's database; this repository is
+# public, so nothing readable is ever committed and the log shows only counts. Step "key" makes that key the first time and
+# prints its public half. A push to main that changes an address file loads it into production by itself.
+on:
+  push:
+    branches: [main]
+    paths: ['data/addresses.*.enc.json']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: sandbox or production
+        required: true
+        default: production
+        type: choice
+        options: [sandbox, production]
+      step:
+        description: key (make or show the public key) or load
+        required: true
+        default: load
+        type: choice
+        options: [load, key]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-addresses-${{ inputs.target || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Deploy key
+        id: settings
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+          SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+          TARGET: ${{ inputs.target || 'production' }}
+          REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = production ]; then
+            [ "$REF" = refs/heads/main ] || { echo "::error::Production only from main"; exit 1; }
+            sa="$SA_PRODUCTION"
+          else sa="$SA_SANDBOX"; fi
+          [ -n "$sa" ] || { echo "::error::No deploy key for $TARGET in this repository's secrets."; exit 1; }
+          printf '%s' "$sa" > "$RUNNER_TEMP/sa.json"
+          echo "project=$(node -e 'console.log(require(process.argv[1]).project_id)' "$RUNNER_TEMP/sa.json")" >> "$GITHUB_OUTPUT"
+      - name: Install
+        working-directory: functions
+        run: npm ci --no-audit --no-fund --omit=dev
+      - name: Key or load
+        working-directory: functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          STEP: ${{ inputs.step || 'load' }}
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          if [ "$STEP" = key ]; then node scripts/load-addresses.js key
+          else node scripts/load-addresses.js load "../data/addresses.$PROJECT.enc.json"; fi

@@ -279,3 +279,34 @@ test('someone not on the Users list, or not at the plant, is refused', async () 
   await assert.rejects(S.udclCall(db, { email: 'stranger@example.com' }, PLANT, { op: 'view' }), /not on the Users list/);
   await assert.rejects(S.udclCall(db, mgr, 'fac_charleston', { op: 'view' }), /not set up for/);
 });
+
+test('Joe 11/2: a PO box, mailbox, RR box or c/o is not a ship-to address', () => {
+  ['P.O. BOX 434', 'P O BOX 69', 'PO BOX 215', 'R.R. 4 BOX 82', 'R. D. #2, BOX 300', 'BOX 3, ROUTE 88', 'NUTRITION INC.C/O A.G. SCHOOLS', 'P.C.N. C/O UNIONTOWN SCHOOLS', 'MAILBOX 12']
+    .forEach(a => assert.equal(U.notStreet(a), true, a));
+  ['3349 PITTSBURGH ST', '7857 SANG RUN ROAD', 'ROUTE 88', '1 BOXWOOD LN', '24 POST RD', '100 CO-OP WAY', 'BOXER ST']
+    .forEach(a => assert.equal(U.notStreet(a), false, a));
+});
+
+test('Joe 11/2: checked addresses are loaded and stay through the next upload; an upload never swaps a street for a PO box', async () => {
+  const { db } = await imported();
+  const out = await S.loadAddresses(db, PLANT, [
+    { key: '5002', address: '3349 PITTSBURGH ST', city: 'PERRYOPOLIS', state: 'pa', zip: '15473', confidence: 'high', source: 'store site' },
+    { key: '5003', address: 'P.O. BOX 9', city: 'TOWN', state: 'PA' },
+    { key: '9999', address: '1 NOWHERE RD', city: 'X', state: 'PA' }
+  ], 'loader@workflow', now);
+  assert.deepEqual(out, { changed: 1, same: 0, missing: 1, refused: 1 });
+  let v = await S.udclCall(db, disp, PLANT, { op: 'view' });
+  assert.equal(v.customers['5002'].address, '3349 PITTSBURGH ST');
+  assert.equal(v.customers['5002'].state, 'PA');
+  assert.equal(v.customers['5002'].addressChecked, true);
+  const m = U.menuStops(MENU);
+  await S.udclCall(db, boss, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted,
+    addresses: { 5001: { address: 'P.O. BOX 1', city: 'TOWN', state: 'PA' }, 5002: { address: '99 WRONG ST', city: 'ELSEWHERE', state: 'KY' }, 5003: { address: '5 OAK ST', address2: 'PO BOX 77', city: 'TOWN', state: 'PA' } }, gps: {} }, now);
+  v = await S.udclCall(db, disp, PLANT, { op: 'view' });
+  assert.equal(v.customers['5002'].address, '3349 PITTSBURGH ST', 'a checked address stays through the upload');
+  assert.equal(v.customers['5002'].city, 'PERRYOPOLIS');
+  assert.equal(v.customers['5001'].address, '1 MAIN ST', 'a PO box does not replace a street address');
+  assert.equal(v.customers['5003'].address, '5 OAK ST', 'an unchecked street address still comes from the upload');
+  assert.equal(v.customers['5003'].address2, '', 'a PO box second line is left off');
+  assert.equal((await S.loadAddresses(db, PLANT, [{ key: '5002', address: '3349 PITTSBURGH ST', city: 'PERRYOPOLIS', state: 'PA', zip: '15473', confidence: 'high', source: 'store site' }], 'loader@workflow', now)).same, 1);
+});

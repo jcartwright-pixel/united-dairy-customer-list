@@ -220,6 +220,11 @@ async function importMenu(db, plant, email, input, stamp) {
     // What the upload has replaces what is here (counted when it changes something).
     const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && after[k] !== v) { after[k] = v; return 1; } return 0; };
     const got = U.cleanCustomer({ address: a.address || g.address, address2: a.address2, city: a.city || g.city, state: a.state || g.state, zip: a.zip, keys: keysFrom[key], lat: g.lat, lon: g.lon });
+    // Joe 11/2: a PO box, mailbox, RR box or "c/o" is not a ship-to address. The upload never puts one in place of a street address,
+    // and an address that was checked (looked up by the store's name, addressChecked) stays through the upload: Joe chose that on
+    // 11/2 ("Keep them") so the real ship-to addresses are not undone by the next Route Menu.
+    if (U.notStreet(got.address2)) delete got.address2;
+    if (after.addressChecked || (U.notStreet(got.address) && after.address && !U.notStreet(after.address))) U.ADDRESS_FIELDS.forEach(k => { delete got[k]; });
     let n = 0;
     Object.keys(got).forEach(k => { n += fill(k, got[k]); });
     if (!before) added++; else if (before.name !== after.name || before.chain !== after.chain || before.active === false) changed++;
@@ -304,6 +309,39 @@ async function routeBook(db, plant, route, day) {
   return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops, updatedAt: rd.updatedAt || '' };
 }
 
+/**
+ * Checked ship-to addresses (Joe 11/2: "find the true address ... PO box or mailbox is not a true address"), looked up by the
+ * store's name and town, loaded by the Load Addresses workflow (scripts/load-addresses.js), not from a screen. rows:
+ * [{ key, address, address2, city, state, zip, confidence, source }]. Only customers already on the list are changed; each is marked
+ * addressChecked so the next Route Menu upload keeps it (importMenu). Returns the counts.
+ */
+async function loadAddresses(db, plant, rows, by, stamp) {
+  const now = await readPlant(db, plant);
+  let changed = 0, same = 0, missing = 0, refused = 0;
+  const writes = [];
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const key = U.text(r && r.key, 60), before = now.customers[key];
+    if (!before) { missing++; return; }
+    const fields = U.cleanCustomer({ address: r.address, address2: r.address2 || '', city: r.city, state: r.state, zip: r.zip });
+    if (!fields.address || U.notStreet(fields.address) || U.notStreet(fields.address2)) { refused++; return; }
+    const after = Object.assign({}, before, fields, { addressChecked: true, addressSource: U.text(r.source, 200), addressConfidence: U.text(r.confidence, 20) });
+    if (fields.address !== before.address || fields.city !== before.city) { after.lat = null; after.lon = null; }
+    if (JSON.stringify(Object.assign({}, before, { updatedAt: 0, updatedBy: 0 })) === JSON.stringify(Object.assign({}, after, { updatedAt: 0, updatedBy: 0 }))) { same++; return; }
+    after.updatedAt = stamp; after.updatedBy = by;
+    changed++;
+    writes.push([db.collection(CUSTOMERS).doc(U.customerId(plant, key)), before, after]);
+  });
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([ref, before, after]) => {
+      batch.set(ref, after);
+      logEntry(db, batch, 'address', plant, ref, before, after, by, stamp);
+    });
+    await batch.commit();
+  }
+  return { changed, same, missing, refused };
+}
+
 const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales };
 const NEEDS = { saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList' };
 
@@ -341,4 +379,4 @@ async function salesRows(db, plant) {
   return { rows, savedAt: at };
 }
 
-module.exports = { udclCall, salesRows, routeBook, importMenu, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
+module.exports = { udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
