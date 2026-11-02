@@ -184,6 +184,21 @@ async function ph0(browser) {
     assert.equal(await k.$$eval('#udcl-nav', x => x.length), 0, 'and no menu');
     await shot(k, 'udcl-1920-kiosk');
 
+    // Joe 11/2: a new version published shows the yellow "Update ready" banner with Refresh.
+    const vfile = path.join(__dirname, '..', '..', '..', 'public', 'version.json');
+    fs.writeFileSync(vfile, JSON.stringify({ commit: 'aaa111' }));
+    const u = await page(browser, EMAIL);
+    await u.goto(u.emailFor('customers.html?updatetest=1'));
+    await u.waitForSelector('#rows tr[data-key]');
+    await u.waitForTimeout(500);
+    assert.equal(await u.$$eval('#update-ready', x => x.length), 0, 'no banner while the version is the same');
+    fs.writeFileSync(vfile, JSON.stringify({ commit: 'bbb222' }));
+    await u.evaluate(() => window.UDCL_checkForUpdate());
+    await u.waitForSelector('#update-ready');
+    assert.match(await u.textContent('#update-ready'), /Update ready\. A new version of the Customer List is out/);
+    await shot(u, 'udcl-1920-update-ready');
+    fs.unlinkSync(vfile);
+
     // Joe 11/2: Route Book's Edit box moves a stop to another route; the Load Map window, opened from it, changes it live.
     const q = await page(browser, EMAIL);
     await q.goto(q.emailFor('route-sequence.html?route=803&day=TUE'));

@@ -176,3 +176,43 @@ export async function requireSignIn(ready) {
     }
   }
 }
+
+/* ---------- Update ready (Joe 11/2: "anytime there's an update ... a banner on top to force a refresh. Like we have on the other
+   ones.") The same yellow line as Operations: version.json (written by the deploy, tools/stamp-version.cjs) is read again every
+   3 minutes and whenever the window comes back; a newer one shows the banner with a Refresh button. Nothing reloads by itself
+   while someone may be typing; the kiosk, where nobody types, reloads by itself. ---------- */
+const UPDATE_CHECK_MS = 3 * 60000;
+const readVersion = () => fetch('version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+let firstVersion = null, updateShown = false;
+function updateBanner() {
+  if (updateShown) return;
+  updateShown = true;
+  if (document.body.classList.contains('udcl-kiosk')) { location.reload(); return; }
+  const box = document.createElement('div');
+  box.id = 'update-ready'; box.className = 'update-ready'; box.setAttribute('role', 'status');
+  box.innerHTML = '<span><b>Update ready.</b> A new version of the Customer List is out. Press Refresh to get it.</span><button type="button" id="update-refresh">Refresh</button>';
+  const head = document.querySelector('#screen > .topbar') || document.querySelector('.topbar');
+  if (head && head.parentNode) head.after(box); else document.body.prepend(box);
+  box.querySelector('button').addEventListener('click', () => {
+    const btn = box.querySelector('button');
+    btn.disabled = true; btn.textContent = 'Refreshing…';
+    // Leaving a box saves it: let that save go out before the page reloads.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setTimeout(() => location.reload(), 1500);
+  });
+}
+async function checkForUpdate() {
+  if (updateShown) return;
+  if (!firstVersion) { firstVersion = await readVersion(); return; }
+  if (!firstVersion.commit) return;
+  const now = await readVersion();
+  if (now && now.commit && now.commit !== firstVersion.commit) updateBanner();
+}
+if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || QS.get('updatetest') === '1') {
+  checkForUpdate();
+  setInterval(checkForUpdate, UPDATE_CHECK_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+  window.addEventListener('focus', checkForUpdate);
+  window.addEventListener('online', checkForUpdate);
+}
+window.UDCL_checkForUpdate = checkForUpdate;

@@ -15,6 +15,8 @@ The **United Dairy Customer List** is its own app. It keeps every customer, the 
 
 > The `? Help` button on every screen opens its own part of this guide.
 
+> When a new version of the Customer List is out, a yellow **Update ready** line shows under the header on every open screen (and in the installed app). Press `Refresh` to get it. The Load Map Kiosk refreshes by itself.
+
 ## Customers
 id: customers
 screens: customers.html
