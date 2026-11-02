@@ -94,9 +94,10 @@ async function ph0(browser) {
     assert.equal(await p.textContent('#count'), '9 customers');
     assert.match(await p.textContent('#rows tr[data-key="1196"]'), /Uniontown.*1196.*12 ELM ST, MAPLETON, PA 15401/);
     await shot(p, 'udcl-1920-directory');
-    // Joe 11/2: the Master List tab: counts, and the master list upload (a made-up one: GPS, phone and a group for one customer).
+    // Joe 11/2: the Customer Address List tab: the master file's own headings, and its upload (a made-up one: GPS, phone and a group for one customer).
     await p.click('#views [data-view="master"]');
-    assert.equal(await p.isHidden('#table-wrap'), true);
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Match status', 'Matched address', 'Coordinate source']);
+    assert.equal(await p.isHidden('#route'), true);
     assert.match(await p.textContent('#master .ml-stats'), /9\s*customers/);
     await p.setInputFiles('#i-addr', { name: 'Made Up Master List.csv', mimeType: 'text/csv', buffer: Buffer.from('DC,Chain,Account,Customer,Street,City,State,Zip,Latitude,Longitude,Phone,Group\n30,0,1196,ACORN CORNER MARKET,12 ELM ST,MAPLETON,PA,15401,39.9,-79.7,555-0199,Corner Stores\n') });
     // The Excel reader comes from the internet; a test machine stands in a small CSV reader for it.
@@ -105,10 +106,11 @@ async function ph0(browser) {
     await p.waitForSelector('#i-msg .good, #i-msg .bad', { timeout: 60000 });
     assert.ok(await p.$('#i-msg .good'), await p.textContent('#i-msg'));
     const acorn = (await db().collection('udclCustomers').doc('fac_uniontown__1196').get()).data();
-    assert.equal(acorn.phone, '555-0199'); assert.equal(acorn.group, 'Corner Stores'); assert.equal(acorn.lat, 39.9);
+    assert.equal(acorn.phone, '555-0199'); assert.equal(acorn.address2, ''); assert.equal(acorn.group, 'Corner Stores'); assert.equal(acorn.lat, 39.9);
     assert.match(await p.textContent('#master'), /Last master list: Made Up Master List\.csv/);
+    assert.match(await p.textContent('#rows tr[data-key="1196"]'), /39\.900000.*-79\.700000.*555-0199/);
     assert.match(await p.textContent('#imported'), /Master list: Made Up Master List\.csv/);
-    await shot(p, 'udcl-1920-master-list');
+    await shot(p, 'udcl-1920-customer-address-list');
     await p.click('#views [data-view="day"]');
     await p.selectOption('#day', 'TUE');
     await p.click('#rows tr[data-key="40463"]');

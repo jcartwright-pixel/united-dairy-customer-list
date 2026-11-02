@@ -23,8 +23,8 @@ screens: customers.html
 
 The **United Dairy Customer List** (UDCL): the one list of every customer, the routes and days they get a delivery, and in what order. The Sales app and the drivers' route book read it from here. Each plant keeps its own list (Uniontown first).
 
-1. Pick a tab: `By Customer` (one line per customer: chain, group, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, group, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). The `Master List` tab is where the master list is uploaded (see its own part of this guide).
-2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory`), **DC** and **Chain**. **Sort by** changes the order.
+1. Pick a tab: `By Customer` (one line per customer: chain, group, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, group, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). The `Customer Address List` tab shows every customer's address, GPS and phone under the master file's own headings, and is where that file is uploaded (see its own part of this guide).
+2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory` or `Customer Address List`), **DC** and **Chain**. **Sort by** changes the order.
 3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
 4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
 
@@ -48,21 +48,23 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 !> Do not import an old Route Menu. A route day that is not in the workbook is taken off, and its customers move to not active (shown crossed out).
 
-## Master List
+## Customer Address List
 id: customers-master
 screens: customers.html?view=master
 
-The tab on **Customers** where the company's **master list** goes in: every customer of every distribution center with its address, GPS, phone and group. The boxes at the top count the customers, how many have GPS, a phone or a group, and how many still have no address.
+The tab on **Customers** where the company's **master address list** goes in, and where you see what came from it: one line per customer under the file's own headings (DC, Chain, Account, Customer, Street, Second line, City, State, ZIP, Latitude, Longitude, Phone, Match status, Matched address, Coordinate source). The addresses, GPS and phones everywhere in the Customer List come from here. The line above the list counts the customers, how many have GPS or a phone, and how many still have no address.
 
-1. Open `Customers`, then the `Master List` tab.
-2. Press the file box and pick the master list (.xlsx, .csv or .txt). It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and zip. **Latitude**, **Longitude**, **Phone**, **Contact**, **Group** and **Match status** are read when they are there.
-3. Press `Upload` and wait for the green line. A big list can take a minute.
+1. Open `Customers`, then the `Customer Address List` tab.
+2. In the **Upload the master address list** box, press the file box and pick the file (.xlsx, .csv or .txt). It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and ZIP. **Latitude**, **Longitude**, **Phone**, **Contact**, **Group**, **Match status**, **Matched address** and **Coordinate source** are read when they are there.
+3. Press `Upload` and wait for the green line. A list of five thousand customers takes about a minute.
+4. Narrow the list with **Find**, **DC** and **Chain**. Tap a line to open the customer's card. A **Latitude** opens the spot in Google Maps.
 
 ### Buttons
 
 - `Upload` (Administrators): reads the file. Each customer gets its name, chain, distribution center and address from it, and the GPS, phone, contact and group the file has. A customer the list does not have yet is added with no route.
-- The same box takes a sheet of **checked ship-to addresses** (Account, Street, City, State and Zip headings). The screen tells which one you picked. Each checked address replaces that customer's address and stays through later uploads.
-- Under the box: when the master list and the checked addresses sheet were last uploaded, and by whom.
+- The same box takes a sheet of **checked ship-to addresses** (Account, Street, City, State and Zip headings). The screen tells which one you picked.
+- `What an upload changes` opens the list of what an upload changes, keeps and removes.
+- The line under the box says when the master list and the checked addresses were last uploaded, and by whom.
 
 > Routes, run and load order, notes and keys always stay. A phone or group the file leaves blank stays as it is here.
 
@@ -70,7 +72,7 @@ The tab on **Customers** where the company's **master list** goes in: every cust
 
 > A customer from an earlier master list that the new one no longer has is removed, but only when it is on no route and the file is the whole list. A part of the list removes nothing.
 
-!> Do not upload an old master list. What the file has wins over what was typed here (except checked addresses).
+!> Do not pick the master file in `Upload Route Menu`: that box takes only the Route Menu workbook. Do not upload an old master list either; what the file has wins over what was typed here (except checked addresses).
 
 ## Route Book
 id: route-sequence
@@ -139,7 +141,7 @@ screens: administration.html
 For administrators only (it is not in the menu for anyone else).
 
 1. `Load Map Kiosk` opens the plant floor kiosk view, to see how it looks. Nothing can be changed from it.
-2. `Upload the customer list` goes to **Customers**, where `Upload Route Menu` uploads the workbooks and the `Master List` tab takes the master list.
+2. `Upload the customer list` goes to **Customers**, where `Upload Route Menu` uploads the workbooks and the `Customer Address List` tab takes the master address list.
 3. Under the tiles: when the last upload was, by whom and from which file.
 
 !> Do not upload an old Route Menu. A new upload overrules the changes made here.

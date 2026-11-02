@@ -422,3 +422,8 @@ test('Joe 11/2: the master list reads Phone, Contact and Group when the file has
   assert.equal(rows[0].phone, '555-0199'); assert.equal(rows[0].group, 'Corner Stores');
   assert.equal(rows[1].phone, undefined); assert.equal(rows[1].group, undefined);
 });
+
+test('Joe 11/2: a master list with a City heading and no second-line column leaves the second line empty', () => {
+  const rows = U.fullListRows([['DC', 'Chain', 'Account', 'Customer', 'Street', 'City', 'State', 'Zip'], [30, 0, 1196, 'ACORN CORNER MARKET', '12 ELM ST', 'MAPLETON', 'PA', 15401]]);
+  assert.equal(rows[0].address2, ''); assert.equal(rows[0].city, 'MAPLETON'); assert.equal(rows[0].zip, '15401');
+});
