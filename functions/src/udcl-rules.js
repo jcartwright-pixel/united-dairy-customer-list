@@ -31,7 +31,7 @@
   var MAX_ROWS = 30;
   var MAX_STOPS = 60;      // stops on one route day
   var MAX_LINES = 5000;    // lines in one Route Menu upload
-  var LIMITS = { name: 80, account: 20, chain: 12, route: 12, address: 120, city: 60, state: 4, zip: 12, phone: 40, contact: 80, keys: 120, note: 500, notes: 2000, startTime: 20 };
+  var LIMITS = { name: 80, account: 20, chain: 12, route: 12, address: 120, city: 60, state: 4, zip: 12, phone: 40, contact: 80, keys: 120, group: 40, note: 500, notes: 2000, startTime: 20 };
 
   function text(v, max) {
     var t = v === null || v === undefined ? '' : String(v).replace(/\s+/g, ' ').trim();
@@ -363,12 +363,13 @@
   var DCS = [{ code: '1', name: 'Martins Ferry' }, { code: '6', name: 'Lancaster' }, { code: '7', name: 'Fairmont' }, { code: '9', name: 'Marietta' }, { code: '30', name: 'Uniontown' }, { code: '50', name: 'Charleston' }];
   var PLANT_DC = { fac_martins_ferry: '1', fac_uniontown: '30', fac_charleston: '50' };
   /** The DC code when it is one of ours ('030' and 30 are '30'), else ''. */
-  function dcOf(v) { var t = numText(v, 4).replace(/^0+(?=\d)/, ''); return DCS.some(function (d) { return d.code === t; }) ? t : ''; }
+  // Joe 11/2: the full company list has every distribution center, also ones with no name here yet (61, 71, 142 ...): keep the number.
+  function dcOf(v) { var t = numText(v, 6).replace(/^0+(?=\d)/, ''); return /^\d{1,4}$/.test(t) ? t : ''; }
   /** "30 Uniontown" for a DC code, '' when it has none. */
-  function dcName(v) { var t = dcOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : ''; }
+  function dcName(v) { var t = dcOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : t ? t + ' DC ' + t : ''; }
   // The parts of a ship-to address (a checked one stays through an upload: importMenu).
   var ADDRESS_FIELDS = ['address', 'address2', 'city', 'state', 'zip', 'lat', 'lon'];
-  var CUSTOMER_FIELDS = ['name', 'chain', 'dc', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
+  var CUSTOMER_FIELDS = ['name', 'chain', 'group', 'dc', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
   function cleanCustomer(c) {
     var out = {};
     CUSTOMER_FIELDS.forEach(function (k) {

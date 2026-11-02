@@ -81,7 +81,14 @@ async function ph0(browser) {
     // Joe 11/2: the Directory tab: no routes, with GPS and phone.
     await p.click('#views [data-view="list"]');
     await p.selectOption('#day', '');
-    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Account', 'Customer', 'Address', 'GPS', 'Phone']);
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Group', 'Account', 'Customer', 'Address', 'GPS', 'Phone']);
+    // Group: add a new group from the drop-down; it saves and then shows in every customer's list.
+    await p.selectOption('#rows select.grp[data-key="1526"]', '+');
+    await p.fill('#rows input.grp-new', "Kuhn's Market");
+    await p.press('#rows input.grp-new', 'Enter');
+    await p.waitForFunction(() => { const s = document.querySelector('#rows select.grp[data-key="1526"]'); return s && s.value === "Kuhn's Market"; });
+    assert.ok(await p.$$eval('#rows select.grp[data-key="1196"] option', x => x.some(o => o.textContent === "Kuhn's Market")));
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__1526').get()).data().group, "Kuhn's Market");
     assert.equal(await p.textContent('#count'), '9 customers');
     assert.match(await p.textContent('#rows tr[data-key="1196"]'), /Uniontown.*1196.*12 ELM ST, MAPLETON, PA 15401/);
     await shot(p, 'udcl-1920-directory');

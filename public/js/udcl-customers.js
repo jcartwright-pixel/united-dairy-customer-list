@@ -11,7 +11,7 @@ const params = new URLSearchParams(location.search);
 let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
 let allLines = [];
 const $ = (id) => document.getElementById(id);
-const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, sort: $('sort').value || view });
+const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, dc: $('dcpick').value, sort: $('sort').value || view });
 const dayName = (d) => U.DAY_NAMES[d] || d;
 
 function fillPickers() {
@@ -20,6 +20,8 @@ function fillPickers() {
   keep('day', U.DAYS.map(d => [d, dayName(d)]), 'All days');
   const chains = [...new Set(Object.values(data.customers).map(c => c.chain).filter(Boolean))].sort(U.byRoute);
   keep('chain', chains.map(c => [c, 'Chain ' + c]), 'All chains');
+  const dcs = [...new Set(Object.values(data.customers).map(c => U.dcOf(c.dc)).filter(Boolean))].sort(U.byRoute);
+  keep('dcpick', dcs.map(d => [d, dcPlain(d)]), 'All DCs');
   if (params.get('route') && !$('route').value) $('route').value = params.get('route');
 }
 
@@ -28,8 +30,8 @@ function customersShown() {
   const fl = f(), lines = U.pick(allLines, Object.assign({}, fl, { sort: 'customer' }));
   const keys = new Set(lines.map(l => l.key));
   const words = U.text(fl.q).toUpperCase().split(' ').filter(Boolean);
-  const rows = U.customerRows(data.customers, allLines).filter(c => keys.has(c.key) || (!fl.route && !fl.day && (!fl.chain || c.chain === fl.chain) && !(c.deliveries || []).length &&
-    words.every(w => [c.name, c.account, c.city, c.chain, c.address, U.dcName(c.dc)].join(' ').toUpperCase().indexOf(w) >= 0)));
+  const rows = U.customerRows(data.customers, allLines).filter(c => (keys.has(c.key) || (!fl.route && !fl.day && (!fl.chain || c.chain === fl.chain) && !(c.deliveries || []).length &&
+    words.every(w => [c.name, c.account, c.city, c.chain, c.group, c.address, U.dcName(c.dc)].join(' ').toUpperCase().indexOf(w) >= 0))) && (!fl.dc || U.dcOf(c.dc) === fl.dc));
   const s = fl.sort === 'customer' || !U.SORTS[fl.sort] ? null : fl.sort;
   if (s === 'account') rows.sort((a, b) => U.byRoute(a.account, b.account));
   else if (s === 'city') rows.sort((a, b) => String(a.city).localeCompare(String(b.city)) || a.name.localeCompare(b.name));
@@ -41,9 +43,13 @@ function customersShown() {
 // holding the route that delivers that day, with no stop number.
 const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
+// Joe 11/2: a Group column on the Directory, picked from a drop-down, with a new group added from the same list.
+const groupsNow = () => [...new Set(Object.values(data.customers).map(c => c.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+const groupCell = (c) => !data.canEdit ? e(c.group || '') : '<select class="grp" data-key="' + e(c.key) + '" aria-label="Group for ' + e(c.name) + '"><option value="">No group</option>' +
+  groupsNow().map(g => '<option' + (g === c.group ? ' selected' : '') + '>' + e(g) + '</option>').join('') + '<option value="+">+ Add a group…</option></select>';
 // Joe 11/2: the Directory tab, "just ... the customer list with the addresses and the GPS coordinates ... and the phone numbers. Not the routes".
 const gpsText = (c) => (c.lat && c.lon) ? Number(c.lat).toFixed(5) + ', ' + Number(c.lon).toFixed(5) : '';
-const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone]];
+const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone]];
 const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]);
 
 function draw() {
@@ -52,11 +58,11 @@ function draw() {
   const fl = f();
   if (view === 'list') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:8%">DC</th><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:22%">Customer</th><th class="l">Address</th><th style="width:14%">GPS</th><th class="l" style="width:11%">Phone</th></tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
+    $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:20%">Customer</th><th class="l">Address</th><th style="width:12%">GPS</th><th class="l" style="width:10%">Phone</th></tr>';
+    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
       '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td></tr>').join('') ||
-      '<tr><td colspan="7" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+      '<tr><td colspan="8" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
     const rows = customersShown();
@@ -106,7 +112,7 @@ function openCustomer(key) {
   const p = panel(add ? 'Add a customer' : c.name, (add ? '<label>Account number<input id="c-account" inputmode="numeric" placeholder="Leave blank if it has none"></label>' : '<div class="deliveries">Account ' + v('account') + (c.active === false ? ' · <b>Not on the Route Menu any more</b>' : '') + '<br>' + (ds.length ? ds.map(d => '<a href="route-sequence.html?route=' + encodeURIComponent(d.route) + '&day=' + d.day + '">' + e(dayName(d.day)) + ' route ' + e(d.route) + ', stop ' + d.stop + '</a>').join('<br>') : 'Not on any route day') + '</div>') +
     '<label>Name<input id="c-name" value="' + v('name') + '"' + dis + '></label>' +
     '<div class="two"><label>Chain<input id="c-chain" value="' + v('chain') + '"' + dis + '></label><label>Phone<input id="c-phone" value="' + v('phone') + '"' + dis + '></label></div>' +
-    '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + U.DCS.map(d => '<option value="' + d.code + '"' + ((c ? U.dcOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
+    '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + (c && U.dcOf(c.dc) && !U.DCS.some(d => d.code === U.dcOf(c.dc)) ? [{ code: U.dcOf(c.dc), name: 'DC ' + U.dcOf(c.dc) }] : []).concat(U.DCS).map(d => '<option value="' + d.code + '"' + ((c ? U.dcOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
     '<label>Street<input id="c-address" value="' + v('address') + '"' + dis + '></label><label>Street, line 2<input id="c-address2" value="' + v('address2') + '"' + dis + '></label>' +
     '<div class="three"><label>City<input id="c-city" value="' + v('city') + '"' + dis + '></label><label>State<input id="c-state" value="' + v('state') + '" maxlength="4"' + dis + '></label><label>Zip<input id="c-zip" value="' + v('zip') + '"' + dis + '></label></div>' +
     '<label>Contact<input id="c-contact" value="' + v('contact') + '"' + dis + '></label>' +
@@ -226,8 +232,27 @@ function setData(d) {
 }
 
 document.querySelectorAll('#views button').forEach(b => { b.onclick = () => { view = b.dataset.view; $('sort').value = ''; history.replaceState(null, '', '?view=' + view); draw(); }; });
-['q', 'route', 'day', 'chain', 'sort'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', draw));
-$('rows').addEventListener('click', ev => { if (ev.target.closest('a')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
+['q', 'route', 'day', 'chain', 'dcpick', 'sort'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', draw));
+async function saveGroup(key, group) {
+  try { const out = await saveStep('saveCustomer', { key, fields: { group } }); data.customers[key] = out.customer; showError(''); }
+  catch (err) { showError(serverText(err, 'the customer list')); }
+  rebuild();
+}
+$('rows').addEventListener('change', ev => {
+  const sel = ev.target.closest('select.grp');
+  if (sel) {
+    if (sel.value !== '+') return saveGroup(sel.dataset.key, sel.value);
+    // "+ Add a group…": the box becomes a place to type the new group's name; Enter or leaving it saves it.
+    const box = document.createElement('input');
+    box.className = 'grp-new'; box.placeholder = 'New group name'; box.maxLength = U.LIMITS.group; box.dataset.key = sel.dataset.key;
+    sel.replaceWith(box); box.focus();
+    let done = false;
+    const finish = () => { if (done) return; done = true; const v = box.value.trim(); if (v) saveGroup(box.dataset.key, v); else draw(); };
+    box.addEventListener('keydown', k => { if (k.key === 'Enter') finish(); if (k.key === 'Escape') { done = true; draw(); } });
+    box.addEventListener('blur', finish);
+  }
+});
+$('rows').addEventListener('click', ev => { if (ev.target.closest('a, select, input')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
 $('add').onclick = () => openCustomer(null);
 $('import').onclick = openImport;
 printMenu($('udcl-print-menu'), printItems);

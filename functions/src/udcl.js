@@ -352,8 +352,8 @@ async function importAddresses(db, plant, email, input, stamp) {
 
 /**
  * Joe 11/2: "The full list can be uploaded if the customer is not showing on there. It needs to be added." The company's full
- * customer list (every distribution center; fullListRows). Only this plant's distribution center is read (Joe picked: Uniontown now,
- * each other DC once its plant is set up). A customer not on the list is added with no route. One already here keeps its routes,
+ * customer list (every distribution center; fullListRows). Joe 11/2: "I want all 5,066 rows imported": every DC goes into this
+ * plant's list. A customer of another DC is kept apart by its key (D<dc>-<account>), since account numbers repeat across DCs. A customer not on the list is added with no route. One already here keeps its routes,
  * name and notes; its chain and address are filled in from the list, except a checked address (addressChecked) and never a PO box,
  * mailbox or c/o in place of a street. Match on the account, inside this plant's DC (account numbers repeat across DCs).
  */
@@ -362,17 +362,17 @@ async function importFullList(db, plant, email, input, stamp) {
   if (!all.length) fail('BAD_REQUEST', 'No customers were found. The full list needs DC, ACCOUNT and NAME headings.');
   const dc = U.PLANT_DC[plant] || '';
   if (!dc) fail('BAD_REQUEST', 'This plant has no distribution center number yet, so the full list cannot be read for it.');
-  const mine = all.filter(r => U.numText(r && r.dc, 6).replace(/^0+(?=\d)/, '') === dc);
+  const dcOfRow = (r) => U.dcOf(r && r.dc) || dc, mine = all;
   const now = await readPlant(db, plant);
   let added = 0, filled = 0, same = 0;
   const writes = [];
   mine.forEach(r => {
     const account = U.numText(r.account, U.LIMITS.account), name = U.text(r.name, U.LIMITS.name);
     if (!account || !name) return;
-    const key = U.custKey(account, name), before = now.customers[key] || null;
-    const after = Object.assign({ plant, key, account: account === '0' ? '' : account, name, chain: '', dc, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true }, before || {});
+    const rdc = dcOfRow(r), key = (rdc === dc ? '' : 'D' + rdc + '-') + U.custKey(account, name), before = now.customers[key] || null;
+    const after = Object.assign({ plant, key, account: account === '0' ? '' : account, name, chain: '', dc: rdc, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true }, before || {});
     after.onCompanyList = true;
-    if (!after.dc) after.dc = dc;
+    if (!after.dc) after.dc = rdc;
     const got = U.cleanCustomer({ chain: r.chain, address: r.address, address2: r.address2, city: r.city, state: r.state, zip: r.zip });
     if (U.notStreet(got.address2)) delete got.address2;
     if (after.addressChecked || !got.address || (U.notStreet(got.address) && after.address && !U.notStreet(after.address))) ['address', 'address2', 'city', 'state', 'zip'].forEach(k => { delete got[k]; });
@@ -390,9 +390,9 @@ async function importFullList(db, plant, email, input, stamp) {
     writes.slice(i, i + 200).forEach(([ref, before, after]) => { batch.set(ref, after); logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp); });
     await batch.commit();
   }
-  const other = all.length - mine.length;
+  const other = mine.filter(r => dcOfRow(r) !== dc).length;
   const counts = { read: mine.length, added, filled, same, otherDc: other };
-  return { ok: true, counts, message: mine.length + ' customers for ' + (U.DCS.find(d => d.code === dc) || { name: 'DC ' + dc }).name + ': ' + added + ' added (no route yet), ' + filled + ' had their chain or address filled in, ' + same + ' already right.' + (other ? ' ' + other + ' customers of other distribution centers were left for their own plants.' : '') };
+  return { ok: true, counts, message: mine.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added (no route yet), ' + filled + ' had their chain or address filled in, ' + same + ' already right.' };
 }
 
 const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
@@ -426,8 +426,8 @@ async function salesRows(db, plant) {
   const d = await readPlant(db, plant);
   if (!d.routeDays.length) return null;
   const rows = [];
-  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '' }); }));
-  ((d.meta && d.meta.unrouted) || []).forEach(x => rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '' }));
+  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '', group: c.group || '' }); }));
+  ((d.meta && d.meta.unrouted) || []).forEach(x => rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '', group: ((d.customers[x.key] || {}).group) || '' }));
   const at = d.routeDays.map(r => r.updatedAt || '').concat(Object.values(d.customers).map(c => c.updatedAt || '')).sort().pop() || '';
   return { rows, savedAt: at };
 }

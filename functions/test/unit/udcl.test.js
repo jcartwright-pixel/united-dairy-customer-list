@@ -157,10 +157,12 @@ test('an import makes the customers and route days, with the Route Book\'s start
   assert.equal(v.customers['5001'].dc, U.PLANT_DC[PLANT], 'a plant\'s customers start with its distribution center code');
 });
 
-test('distribution center codes: only ours are kept, written the one way', () => {
+test('distribution center codes: written the one way; a DC with no name here keeps its number (Joe 11/2: every DC imported)', () => {
   assert.equal(U.dcOf('030'), '30');
   assert.equal(U.dcOf(50), '50');
-  assert.equal(U.dcOf('8'), '');
+  assert.equal(U.dcOf('61'), '61');
+  assert.equal(U.dcOf('Uniontown'), '');
+  assert.equal(U.dcName('61'), '61 DC 61');
   assert.equal(U.dcName('1'), '1 Martins Ferry');
   assert.equal(U.dcName(''), '');
   assert.deepEqual(U.cleanCustomer({ dc: '7', name: 'X' }), { name: 'X', dc: '7' });
@@ -342,11 +344,19 @@ test('Joe 11/2: the company full list adds missing customers of this plant\'s DC
   const { db } = await imported();
   await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importFullList', rows }), /Only an administrator/);
   const out = await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows }, now);
-  assert.deepEqual([out.counts.read, out.counts.added, out.counts.otherDc], [3, 1, 1]);
+  // Joe 11/2: "I want all 5,066 rows imported": the other DC's customer comes in too, kept apart by its DC (same account 5001).
+  assert.deepEqual([out.counts.read, out.counts.added, out.counts.otherDc], [4, 2, 1]);
   let v = await S.udclCall(db, boss, PLANT, { op: 'view' });
   assert.equal(v.customers['7777'].name, 'NEW CORNER SHOP');
   assert.equal(v.customers['7777'].chain, '0');
   assert.equal(v.customers['7777'].dc, '30');
+  assert.equal(v.customers['D1-5001'].name, 'OTHER DC STORE');
+  assert.equal(v.customers['D1-5001'].dc, '1');
+  assert.equal(v.customers['5001'].name, 'ACME MARKET', 'the same account in another DC does not touch this one');
+  // A group picked on the Directory goes to the Sales app with the customer's lines.
+  await S.udclCall(db, boss, PLANT, { op: 'saveCustomer', key: '5002', fields: { group: "Best's Stores" } }, now);
+  const sales = await S.salesRows(db, PLANT);
+  assert.equal(sales.rows.find(r => r.account === '5002').group, "Best's Stores");
   assert.equal(v.customers['5001'].address, '1 MAIN ST', 'a PO box never replaces a street');
   assert.equal(v.customers['5002'].address, '22 OAK AVE');
   assert.ok(v.routeDays.some(rd => (rd.stops || []).some(s => s.key === '5002')), 'routes are kept');
