@@ -81,7 +81,7 @@ async function ph0(browser) {
     // Joe 11/2: the Directory tab: no routes, with GPS and phone.
     await p.click('#views [data-view="list"]');
     await p.selectOption('#day', '');
-    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Group', 'Account', 'Customer', 'Address', 'GPS', 'Phone']);
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Group', 'Account', 'Customer', 'Address', 'GPS', 'Phone', 'Address check']);
     // Group: add a new group from the drop-down; it saves and then shows in every customer's list.
     await p.selectOption('#rows select.grp[data-key="1526"]', '+');
     await p.fill('#rows input.grp-new', "Kuhn's Market");

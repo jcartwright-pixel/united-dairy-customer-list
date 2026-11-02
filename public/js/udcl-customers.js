@@ -49,7 +49,7 @@ const groupCell = (c) => !data.canEdit ? e(c.group || '') : '<select class="grp"
   groupsNow().map(g => '<option' + (g === c.group ? ' selected' : '') + '>' + e(g) + '</option>').join('') + '<option value="+">+ Add a group…</option></select>';
 // Joe 11/2: the Directory tab, "just ... the customer list with the addresses and the GPS coordinates ... and the phone numbers. Not the routes".
 const gpsText = (c) => (c.lat && c.lon) ? Number(c.lat).toFixed(5) + ', ' + Number(c.lon).toFixed(5) : '';
-const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone]];
+const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone], ['Address check', c => c.addressCheck || '']];
 const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]);
 
 function draw() {
@@ -58,11 +58,11 @@ function draw() {
   const fl = f();
   if (view === 'list') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:20%">Customer</th><th class="l">Address</th><th style="width:12%">GPS</th><th class="l" style="width:10%">Phone</th></tr>';
+    $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:18%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
     $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
-      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td></tr>').join('') ||
-      '<tr><td colspan="8" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td><td class="l" title="' + e([c.addressNote, c.addressProposed && ('Proposed: ' + c.addressProposed), c.gpsFrom && ('GPS from ' + c.gpsFrom)].filter(Boolean).join(' · ')) + '"><small>' + e(c.addressCheck || '') + '</small></td></tr>').join('') ||
+      '<tr><td colspan="9" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
     const rows = customersShown();
@@ -113,6 +113,7 @@ function openCustomer(key) {
     '<label>Name<input id="c-name" value="' + v('name') + '"' + dis + '></label>' +
     '<div class="two"><label>Chain<input id="c-chain" value="' + v('chain') + '"' + dis + '></label><label>Phone<input id="c-phone" value="' + v('phone') + '"' + dis + '></label></div>' +
     '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + (c && U.dcOf(c.dc) && !U.DCS.some(d => d.code === U.dcOf(c.dc)) ? [{ code: U.dcOf(c.dc), name: 'DC ' + U.dcOf(c.dc) }] : []).concat(U.DCS).map(d => '<option value="' + d.code + '"' + ((c ? U.dcOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
+    (c && (c.addressCheck || c.addressProposed) ? '<div class="deliveries">Address check: ' + e(c.addressCheck || '') + (c.addressProposed ? '<br>Proposed address: <b>' + e(c.addressProposed) + '</b>' : '') + (c.addressNote ? '<br>' + e(c.addressNote) : '') + (c.lat && c.lon ? '<br>GPS ' + e(gpsText(c)) + (c.gpsFrom ? ' (' + e(c.gpsFrom) + ')' : '') : '') + '</div>' : '') +
     '<label>Street<input id="c-address" value="' + v('address') + '"' + dis + '></label><label>Street, line 2<input id="c-address2" value="' + v('address2') + '"' + dis + '></label>' +
     '<div class="three"><label>City<input id="c-city" value="' + v('city') + '"' + dis + '></label><label>State<input id="c-state" value="' + v('state') + '" maxlength="4"' + dis + '></label><label>Zip<input id="c-zip" value="' + v('zip') + '"' + dis + '></label></div>' +
     '<label>Contact<input id="c-contact" value="' + v('contact') + '"' + dis + '></label>' +

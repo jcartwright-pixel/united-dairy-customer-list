@@ -391,25 +391,36 @@
   }
 
   /**
-   * Joe 11/2: the company's full customer list, every distribution center: headings DC, CHAIN, ACCOUNT, NAME, then the street, a
-   * second street (often the same again), city, state and zip, with or without headings of their own. Chain 0 is chain 0.
-   * One row per customer: { dc, chain, account, name, address, address2, city, state, zip }; rows with no account are skipped.
+   * Joe 11/2: the company's full customer list, every distribution center. Two layouts:
+   *  - DC, CHAIN, ACCOUNT, NAME, then the street, a second street (often the same again), city, state and zip with no headings;
+   *  - the master file ("All Customers - One Tab"): DC, Chain, Account, Customer, Original street, Original second line, Original
+   *    city, Original state, Original ZIP, Matched address, Address changed?, Latitude, Longitude, Match status, Coordinate source,
+   *    Review notes ... Rows with no DC or account (map points only) are skipped. Chain 0 is chain 0.
+   * One row per customer: { dc, chain, account, name, address, address2, city, state, zip, lat, lon, check, checkNote, proposed, gpsFrom }.
    */
   function fullListRows(rows) {
     rows = rows || [];
     for (var r = 0; r < Math.min(rows.length, 20); r++) {
       var cells = (rows[r] || []).map(function (c) { return text(c).toUpperCase(); });
-      var dc = cells.indexOf('DC'), acct = cells.indexOf('ACCOUNT'), name = cells.indexOf('NAME'), chain = cells.indexOf('CHAIN');
+      var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt === undefined ? -1 : dflt; };
+      var dc = at(['DC']), acct = at(['ACCOUNT']), name = at(['NAME', 'CUSTOMER']), chain = at(['CHAIN']);
       if (dc < 0 || acct < 0 || name < 0) continue;
-      var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt; };
-      var a1 = at(['ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1'], name + 1), a2 = at(['ADDRESS 2', 'STREET 2'], name + 2), city = at(['CITY'], name + 3), st = at(['STATE', 'ST'], name + 4), zip = at(['ZIP', 'ZIP CODE'], name + 5);
+      var a1 = at(['ORIGINAL STREET', 'ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1'], name + 1), a2 = at(['ORIGINAL SECOND LINE', 'ADDRESS 2', 'STREET 2'], name + 2),
+        city = at(['ORIGINAL CITY', 'CITY'], name + 3), st = at(['ORIGINAL STATE', 'STATE', 'ST'], name + 4), zip = at(['ORIGINAL ZIP', 'ZIP', 'ZIP CODE'], name + 5),
+        lat = at(['LATITUDE', 'LAT']), lon = at(['LONGITUDE', 'LON', 'LNG']), check = at(['MATCH STATUS']), note = at(['REVIEW NOTES']), prop = at(['MATCHED ADDRESS']),
+        changed = at(['ADDRESS CHANGED?']), from = at(['COORDINATE SOURCE']);
+      var cell = function (row, i, max) { return i >= 0 ? text(row[i], max) : ''; };
+      var num = function (row, i) { var v = i >= 0 ? Number(row[i]) : NaN; return isFinite(v) && v ? v : null; };
       var out = [];
       for (var i = r + 1; i < rows.length; i++) {
-        var row = rows[i] || [], account = numText(row[acct], LIMITS.account), nm = text(row[name], LIMITS.name);
-        if (!account || !nm) continue;
+        var row = rows[i] || [], account = numText(row[acct], LIMITS.account), nm = text(row[name], LIMITS.name), d = numText(row[dc], 6).replace(/^0+(?=\d)/, '');
+        if (!account || !nm || !d) continue;
         var s1 = text(row[a1], LIMITS.address), s2 = text(row[a2], LIMITS.address);
-        out.push({ dc: numText(row[dc], 6).replace(/^0+(?=\d)/, ''), chain: chain >= 0 ? numText(row[chain], LIMITS.chain) : '', account: account, name: nm, address: s1, address2: s2 && s2.toUpperCase() !== s1.toUpperCase() ? s2 : '',
-          city: text(row[city], LIMITS.city), state: text(row[st], LIMITS.state).toUpperCase(), zip: numText(row[zip], LIMITS.zip) });
+        var x = { dc: d, chain: chain >= 0 ? numText(row[chain], LIMITS.chain) : '', account: account, name: nm, address: s1, address2: s2 && s2.toUpperCase() !== s1.toUpperCase() ? s2 : '',
+          city: text(row[city], LIMITS.city), state: text(row[st], LIMITS.state).toUpperCase(), zip: numText(row[zip], LIMITS.zip) };
+        if (lat >= 0) { x.lat = num(row, lat); x.lon = num(row, lon); }
+        if (check >= 0) { x.check = cell(row, check, 60); x.checkNote = cell(row, note, 300); x.gpsFrom = cell(row, from, 80); x.proposed = cell(row, changed, 40).toUpperCase() === 'YES' ? cell(row, prop, 200) : ''; }
+        out.push(x);
       }
       return out;
     }

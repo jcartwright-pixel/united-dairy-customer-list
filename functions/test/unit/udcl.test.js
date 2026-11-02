@@ -340,6 +340,7 @@ test('Joe 11/2: the company full list adds missing customers of this plant\'s DC
   ]);
   assert.equal(rows.length, 4);
   assert.deepEqual(rows[3], { dc: '30', chain: '0', account: '7777', name: 'NEW CORNER SHOP', address: '5 ELM ST', address2: 'SUITE 2', city: 'MAPLETON', state: 'PA', zip: '15401' });
+  assert.equal(rows[0].dc, '1');
   assert.equal(rows[2].address2, '', 'the same street twice is one street');
   const { db } = await imported();
   await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importFullList', rows }), /Only an administrator/);
@@ -365,4 +366,30 @@ test('Joe 11/2: the company full list adds missing customers of this plant\'s DC
   await S.udclCall(db, boss, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted, addresses: {}, gps: {}, book: {}, fileName: 'menu.xlsb' }, now);
   v = await S.udclCall(db, boss, PLANT, { op: 'view' });
   assert.notEqual(v.customers['7777'].active, false);
+});
+
+test('Joe 11/2: the master file ("Replace whatever I have with this") replaces name, chain and address, adds GPS and the address check, keeps routes and groups, and clears an earlier list', async () => {
+  const H = ['DC', 'Chain', 'Account', 'Customer', 'Original street', 'Original second line', 'Original city', 'Original state', 'Original ZIP', 'Matched address', 'Address changed?', 'Latitude', 'Longitude', 'Match status', 'Match quality', 'Coordinate source', 'Change details', 'Review notes'];
+  const first = U.fullListRows([['DC', 'CHAIN', 'ACCOUNT', 'NAME'], [30, 0, 8888, 'OLD LIST STORE', '1 GONE RD', '', 'NOWHERE', 'PA', 15401]]);
+  const rows = U.fullListRows([H,
+    ['30', '415', '5002', 'BEST FOODS #2 MAPLETON', '22 OAK AVE', '22 OAK AVE', 'MAPLETON', 'PA', '15401', '22 OAK AVE, MAPLETON, PA, 15401', 'No', 40.1, -79.7, 'Street address matched', 'Exact', 'US Census', '', ''],
+    ['30', '418', '5002', 'BEST FOODS #2 ANNEX', '24 OAK AVE', '', 'MAPLETON', 'PA', '15401', '', 'Not established', null, null, 'No address match', '', '', '', 'Look it up'],
+    ['1', '0', '50', 'FAR STORE', '9 FAR RD', '', 'FARTOWN', 'OH', '43950', '9 FAR ROAD, FARTOWN, OH, 43950', 'Yes', 40.0, -80.9, 'Address match needs review', 'Non_Exact', 'US Census', '', 'Confirm'],
+    [null, null, null, 'A MAP POINT ONLY', '1 X ST', '', 'Y', 'PA', '1', '', '', 40, -80, 'Verizon saved location', '', '', '', '']
+  ]);
+  assert.equal(rows.length, 3, 'a map point with no DC or account is not a customer');
+  assert.deepEqual([rows[0].lat, rows[0].check, rows[2].proposed], [40.1, 'Street address matched', '9 FAR ROAD, FARTOWN, OH, 43950']);
+  const { db } = await imported();
+  await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: first }, now);
+  await S.udclCall(db, boss, PLANT, { op: 'saveCustomer', key: '5002', fields: { group: "Best's Stores", phone: '555-0100' } }, now);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows }, now);
+  assert.equal(out.counts.removed, 1);
+  const v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.equal(v.customers['8888'], undefined, 'a customer only on the earlier list, with no route, is gone');
+  const c = v.customers['5002'];
+  assert.deepEqual([c.name, c.chain, c.lat, c.addressCheck, c.group, c.phone], ['BEST FOODS #2 MAPLETON', '415', 40.1, 'Street address matched', "Best's Stores", '555-0100']);
+  assert.ok(v.routeDays.some(rd => (rd.stops || []).some(s => s.key === '5002')), 'routes are kept');
+  assert.equal(v.customers['5002-C418'].name, 'BEST FOODS #2 ANNEX', 'the same account under another chain is its own customer');
+  assert.equal(v.customers['5002-C418'].addressNote, 'Look it up');
+  assert.equal(v.customers['D1-50'].addressProposed, '9 FAR ROAD, FARTOWN, OH, 43950');
 });

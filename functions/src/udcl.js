@@ -351,48 +351,79 @@ async function importAddresses(db, plant, email, input, stamp) {
 }
 
 /**
- * Joe 11/2: "The full list can be uploaded if the customer is not showing on there. It needs to be added." The company's full
- * customer list (every distribution center; fullListRows). Joe 11/2: "I want all 5,066 rows imported": every DC goes into this
- * plant's list. A customer of another DC is kept apart by its key (D<dc>-<account>), since account numbers repeat across DCs. A customer not on the list is added with no route. One already here keeps its routes,
- * name and notes; its chain and address are filled in from the list, except a checked address (addressChecked) and never a PO box,
- * mailbox or c/o in place of a street. Match on the account, inside this plant's DC (account numbers repeat across DCs).
+ * Joe 11/2: "The full list can be uploaded if the customer is not showing on there. It needs to be added." and, with the master
+ * file, "Replace whatever I have with this." The company's full customer list (every distribution center; fullListRows) is the
+ * master: each customer in it gets its name, chain, distribution center and address from it (never a PO box, mailbox or c/o in
+ * place of a street), its GPS when the file has one, and the file's address check. A customer missing here is added with no route.
+ * A customer that came from an earlier full list, is not in this one and is on no route is removed. What the file does not have
+ * stays: routes, groups, phones, notes. Keys: Uniontown's own DC by account (as the Route Menu); another DC as D<dc>-<account>.
+ * Account numbers repeat inside a DC under different chains: the one whose chain matches the customer already here keeps the
+ * plain key, the others get -C<chain> (and -2, -3 if even that repeats).
  */
 async function importFullList(db, plant, email, input, stamp) {
   const all = (Array.isArray(input.rows) ? input.rows : []).slice(0, 20000);
-  if (!all.length) fail('BAD_REQUEST', 'No customers were found. The full list needs DC, ACCOUNT and NAME headings.');
+  if (!all.length) fail('BAD_REQUEST', 'No customers were found. The full list needs DC, ACCOUNT and NAME (or Customer) headings.');
   const dc = U.PLANT_DC[plant] || '';
   if (!dc) fail('BAD_REQUEST', 'This plant has no distribution center number yet, so the full list cannot be read for it.');
-  const dcOfRow = (r) => U.dcOf(r && r.dc) || dc, mine = all;
   const now = await readPlant(db, plant);
-  let added = 0, filled = 0, same = 0;
+  const onRoute = new Set();
+  now.routeDays.forEach(rd => (rd.stops || []).forEach(s => onRoute.add(s.key)));
+  // Give every row its key.
+  const clean = all.map(r => ({ r, dc: U.dcOf(r && r.dc) || dc, account: U.numText(r && r.account, U.LIMITS.account), name: U.text(r && r.name, U.LIMITS.name), chain: U.numText(r && r.chain, U.LIMITS.chain) }))
+    .filter(x => x.account && x.name);
+  const base = (x) => (x.dc === dc ? '' : 'D' + x.dc + '-') + U.custKey(x.account, x.name);
+  const byBase = {};
+  clean.forEach(x => { x.base = base(x); (byBase[x.base] = byBase[x.base] || []).push(x); });
+  const used = new Set();
+  Object.keys(byBase).forEach(k => {
+    const list = byBase[k], here = now.customers[k];
+    const first = (here && list.find(x => x.chain === (here.chain || ''))) || list[0];
+    first.key = k; used.add(k);
+    list.filter(x => x !== first).forEach(x => { let key = k + '-C' + (x.chain || '0'), n = 2; while (used.has(key)) key = k + '-C' + (x.chain || '0') + '-' + n++; x.key = key; used.add(key); });
+  });
+  let added = 0, changed = 0, same = 0, removed = 0, gps = 0;
   const writes = [];
-  mine.forEach(r => {
-    const account = U.numText(r.account, U.LIMITS.account), name = U.text(r.name, U.LIMITS.name);
-    if (!account || !name) return;
-    const rdc = dcOfRow(r), key = (rdc === dc ? '' : 'D' + rdc + '-') + U.custKey(account, name), before = now.customers[key] || null;
-    const after = Object.assign({ plant, key, account: account === '0' ? '' : account, name, chain: '', dc: rdc, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true }, before || {});
+  clean.forEach(x => {
+    const r = x.r, key = x.key, before = now.customers[key] || null;
+    const after = Object.assign({ plant, key, account: x.account === '0' ? '' : x.account, name: x.name, chain: '', dc: x.dc, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true }, before || {});
     after.onCompanyList = true;
-    if (!after.dc) after.dc = rdc;
-    const got = U.cleanCustomer({ chain: r.chain, address: r.address, address2: r.address2, city: r.city, state: r.state, zip: r.zip });
-    if (U.notStreet(got.address2)) delete got.address2;
-    if (after.addressChecked || !got.address || (U.notStreet(got.address) && after.address && !U.notStreet(after.address))) ['address', 'address2', 'city', 'state', 'zip'].forEach(k => { delete got[k]; });
-    else if (!got.address2) got.address2 = '';
-    let n = 0;
-    Object.keys(got).forEach(k => { const v = got[k]; if (v !== undefined && v !== null && (v !== '' || k === 'address2') && after[k] !== v) { after[k] = v; n++; } });
-    if (before && (after.address !== before.address || after.city !== before.city)) { after.lat = null; after.lon = null; }
+    after.name = x.name; after.chain = x.chain; after.dc = x.dc;
+    const got = U.cleanCustomer({ address: r.address, address2: r.address2 || '', city: r.city, state: r.state, zip: r.zip });
+    if (U.notStreet(got.address2)) got.address2 = '';
+    const keepStreet = !got.address || (U.notStreet(got.address) && after.address && !U.notStreet(after.address));
+    if (!keepStreet) {
+      if (got.address !== after.address || got.city !== after.city) { after.lat = null; after.lon = null; }
+      ['address', 'address2', 'city', 'state', 'zip'].forEach(k => { after[k] = got[k] || ''; });
+    }
+    const la = Number(r.lat), lo = Number(r.lon);
+    if (isFinite(la) && isFinite(lo) && la && lo) { after.lat = la; after.lon = lo; gps++; }
+    if (r.check !== undefined) {
+      after.addressCheck = U.text(r.check, 60); after.addressNote = U.text(r.checkNote, 300); after.addressProposed = U.text(r.proposed, 200); after.gpsFrom = U.text(r.gpsFrom, 80);
+    }
     if (before && JSON.stringify(Object.assign({}, before, { updatedAt: 0, updatedBy: 0 })) === JSON.stringify(Object.assign({}, after, { updatedAt: 0, updatedBy: 0 }))) { same++; return; }
-    if (!before) added++; else if (n) filled++; else same++;
+    if (!before) added++; else changed++;
     after.updatedAt = stamp; after.updatedBy = email;
-    writes.push([db.collection(CUSTOMERS).doc(U.customerId(plant, key)), before, after]);
+    writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), before, after]);
+  });
+  // A customer from an earlier full list that this one no longer has, and that is on no route, goes.
+  Object.keys(now.customers).forEach(key => {
+    const c = now.customers[key];
+    if (!c.onCompanyList || used.has(key) || onRoute.has(key)) return;
+    removed++;
+    writes.push(['delete', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), c, null]);
   });
   for (let i = 0; i < writes.length; i += 200) {
     const batch = db.batch();
-    writes.slice(i, i + 200).forEach(([ref, before, after]) => { batch.set(ref, after); logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp); });
+    writes.slice(i, i + 200).forEach(([what, ref, before, after]) => {
+      if (what === 'delete') batch.delete(ref); else batch.set(ref, after);
+      logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp);
+    });
     await batch.commit();
   }
-  const other = mine.filter(r => dcOfRow(r) !== dc).length;
-  const counts = { read: mine.length, added, filled, same, otherDc: other };
-  return { ok: true, counts, message: mine.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added (no route yet), ' + filled + ' had their chain or address filled in, ' + same + ' already right.' };
+  const other = clean.filter(x => x.dc !== dc).length, skipped = all.length - clean.length;
+  const counts = { read: clean.length, added, changed, same, removed, gps, otherDc: other, skipped };
+  return { ok: true, counts, message: clean.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added, ' + changed + ' updated, ' + same + ' already right' +
+    (removed ? ', ' + removed + ' from an earlier list removed' : '') + '. ' + gps + ' have GPS. Routes, groups, phones and notes were kept.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
 }
 
 const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
