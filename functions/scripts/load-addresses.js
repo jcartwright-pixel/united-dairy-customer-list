@@ -55,7 +55,12 @@ async function main() {
     return;
   }
   if (step === 'load') {
-    if (!file || !fs.existsSync(file)) { console.log('::notice::No address file ' + file + ' for this project; nothing was loaded.'); return; }
+    if (!file || !fs.existsSync(file)) {
+      // No file for this project yet: make sure the key pair is there and show its public half to encrypt one with.
+      const k = await keyPair(true);
+      console.log('::notice::No address file for this project yet; nothing was loaded.\nPublic key for the address files (safe to share):\n' + k.publicPem);
+      return;
+    }
     const k = await keyPair(false);
     const { plant, rows } = decrypt(file, k.privatePem);
     const target = plantArg || plant;
