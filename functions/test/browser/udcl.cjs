@@ -65,7 +65,9 @@ async function ph0(browser) {
     await p.goto(p.emailFor('customers.html'));
     await p.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await p.textContent('#count'), '9 customers');
-    assert.match(await p.textContent('#rows tr[data-key="1196"]'), /12 ELM ST, MAPLETON, PA 15401.*- - T - - F -.*TUE 803 #\d, FRI 803 #\d/);
+    // Joe 11/2: Chain, Account, Customer, DC, Address, then Sun..Sat holding that day's route (no stop number).
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Chain', 'Account', 'Customer', 'DC', 'Address', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] td', x => x.slice(1).map(t => t.textContent)), ['1196', await p.textContent('#rows tr[data-key="1196"] td:nth-child(3)'), 'Uniontown', '12 ELM ST, MAPLETON, PA 15401', '', '', '803', '', '', '803', '']);
     await shot(p, 'udcl-1920-customers');
     await p.click('#views [data-view="route"]');
     await p.selectOption('#route', '805');

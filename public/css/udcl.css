@@ -146,3 +146,5 @@ body:not(.is-admin) .admin-only { display: none !important; }
 /* The Load Map window opened from Route Sequence (Joe 11/2): the truck, the customers and their load sequence; no menu or notes. */
 body.udcl-mini #udcl-nav, body.udcl-mini .help-link, body.udcl-mini #route-field, body.udcl-mini #notes { display: none !important; }
 body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(4) { display: none; }
+/* Joe 11/2: Customers list, one column per day holding that day's route (room for a 4-digit route such as 8302). */
+.udcl-page th.dayroute, .udcl-page td.dayroute { text-align: center; min-width: 4.2em; white-space: nowrap; font-variant-numeric: tabular-nums; }

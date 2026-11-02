@@ -37,7 +37,11 @@ function customersShown() {
   else if (s === 'route' || s === 'day') rows.sort((a, b) => { const x = (a.deliveries || [])[0] || {}, y = (b.deliveries || [])[0] || {}; return s === 'route' ? U.byRoute(x.route || 'zz', y.route || 'zz') || U.dayIndex(x.day) - U.dayIndex(y.day) : U.dayIndex(x.day) - U.dayIndex(y.day) || U.byRoute(x.route || 'zz', y.route || 'zz'); });
   return rows;
 }
-const deliveriesText = (c) => (c.deliveries || []).map(d => d.day + ' ' + d.route + ' #' + d.stop).join(', ');
+// Joe 11/2: the Customers list shows Chain, Account, Customer, DC (its name only), Address, then a column per day (Sun to Sat)
+// holding the route that delivers that day, with no stop number.
+const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
+const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
+const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]);
 
 function draw() {
   document.querySelectorAll('#views button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
@@ -45,10 +49,12 @@ function draw() {
   const fl = f();
   if (view === 'customer') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:9%">Account</th><th class="l" style="width:24%">Customer</th><th style="width:7%">Chain</th><th style="width:9%">DC</th><th class="l" style="width:20%">Address</th><th style="width:12%">Days</th><th class="l">Route, day and stop</th></tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(c.chain) + '</td><td>' + e(U.dcName(c.dc)) + '</td>' +
-      '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td><td class="days">' + e(U.dayLetters(c.days || [])) + '</td><td class="l">' + e(deliveriesText(c)) + '</td></tr>').join('') ||
-      '<tr><td colspan="7" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:23%">Customer</th><th style="width:8%">DC</th><th class="l">Address</th>' +
+      U.DAYS.map(d => '<th class="dayroute" style="width:5.5%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
+    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
+      '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
+      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') ||
+      '<tr><td colspan="12" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else {
     const lines = U.pick(allLines, fl);
@@ -162,7 +168,7 @@ function printItems() {
   const rds = sortedRouteDays(data.routeDays).filter(rd => (!fl.route || rd.route === fl.route) && (!fl.day || rd.day === fl.day));
   return [
     { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'customer'
-      ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Account', c => c.account], ['Customer', c => c.name], ['Chain', c => c.chain, 1], ['DC', c => U.dcName(c.dc), 1], ['Address', c => U.addressLine(c)], ['Phone', c => c.phone], ['Days', c => U.dayLetters(c.days || []), 1], ['Route, day and stop', c => deliveriesText(c)]])])
+      ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])
       : printDoc('Deliveries', [tablePage('Deliveries · ' + pn, filt || 'All deliveries', U.pick(allLines, fl), lineCols, view === 'route' ? (l => 'Route ' + l.route + ' · ' + dayName(l.day)) : (l => dayName(l.day) + ' · Route ' + l.route))]) },
     { label: 'Route sequence sheets for the office', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + (filt ? ' (' + filt + ')' : '') + ', one page each', html: () => printDoc('Route sequence', rds.map(rd => routeDayPage(rd, data.customers, 'office', pn))) },
     { label: 'Driver route book pages', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + ', with keys, time in / out and the load map', html: () => printDoc('Route book', rds.map(rd => routeDayPage(rd, data.customers, 'driver', pn))) },
