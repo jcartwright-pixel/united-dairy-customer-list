@@ -1,12 +1,14 @@
 name: Deploy Customer List (Firebase)
 
 # Puts the Customer List live on its own web site in Operations' Firebase project: <project>-customers.web.app.
-# Run by hand ("Run workflow"): production is the default (Joe 11/2: just Run, no drop-down to pick), only from main;
-# sandbox any time by picking it (Claude does that for testing). No confirm box to type (Joe 11/1).
+# Joe 11/2: "deploy like UDMS. I don't do anything." Every push to main goes live (production) by itself.
+# Run workflow is still there to deploy the sandbox (Claude, for testing) or to re-run production by hand.
 # Needs this repository's secret FIREBASE_SERVICE_ACCOUNT_SANDBOX (or _PRODUCTION): the same Firebase deploy key Operations uses.
 # Without it, it stops with a notice and deploys nothing. It deploys only this app's site and functions (group udcl), never
 # Operations' screens, functions or database rules.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       target:
@@ -20,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-customer-list-${{ inputs.target }}
+  group: deploy-customer-list-${{ inputs.target || 'production' }}
   cancel-in-progress: false
 
 jobs:
@@ -36,7 +38,7 @@ jobs:
         env:
           SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
           SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
-          TARGET: ${{ inputs.target }}
+          TARGET: ${{ inputs.target || 'production' }}
           REF: ${{ github.ref }}
         shell: bash
         run: |
