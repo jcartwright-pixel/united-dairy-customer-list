@@ -182,3 +182,6 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 .ml-last:empty { display: none; }
 body.udcl-page:has(#views [data-view="master"][aria-selected="true"]) #rows td { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
 .ml-last { color: var(--muted); font-size: 14px; }
+/* Joe 11/2: long lists draw 300 lines at a time. */
+.udcl-page tr.more td { text-align: center; color: var(--muted); padding: 10px; }
+.udcl-page tr.more button { min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }

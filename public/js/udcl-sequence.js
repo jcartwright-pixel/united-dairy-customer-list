@@ -46,7 +46,9 @@ function draw() {
   $('add-box').hidden = !edit || !rd;
   if (edit && rd) {
     const on = new Set(stops.map(s => s.key));
-    const others = Object.values(data.customers).filter(c => !on.has(c.key) && c.active !== false).sort((a, b) => a.name.localeCompare(b.name));
+    // Only this plant's own distribution center's customers can go on its routes (Joe 11/2: the list now holds every DC's).
+    const own = U.PLANT_DC[data.plant] || '';
+    const others = Object.values(data.customers).filter(c => !on.has(c.key) && c.active !== false && (!own || !c.dc || U.dcOf(c.dc) === own)).sort((a, b) => a.name.localeCompare(b.name));
     $('add-pick').innerHTML = '<option value="">Pick a customer to add at the end&hellip;</option>' + others.map(c => '<option value="' + e(c.key) + '">' + e(c.name) + (c.account ? ' (' + e(c.account) + ')' : '') + '</option>').join('');
   }
   const missing = stops.filter(s => !s.loadSeq).length;

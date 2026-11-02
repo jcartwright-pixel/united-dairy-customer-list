@@ -35,6 +35,7 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 - **Group** (on `By Customer` and `Directory`, Administrators and Managers): pick the customer's group from the drop-down, or pick `+ Add a group…`, type the new name and press Enter. The Sales app groups its customers by this. Use it when the chain number puts two different stores together.
 - **DC** box: show one distribution center only. The full customer list brings in every distribution center.
 - On `Directory`, **Address check** says how the address was checked; point at it for the notes and any proposed address. A customer's card shows the same.
+- `Show 300 more` and `Show all` at the end of a long list: the list shows 300 customers at a time so the screen stays quick. **Find** and the boxes still search all of them.
 - The line at the bottom says when the Route Menu and the master list were last uploaded, from which file and by whom.
 - `Print` opens the print menu: this list as shown, the route sequence sheets for the office, the drivers' route book pages, the list by route or by day, or the customers' addresses and phones.
 
@@ -85,7 +86,7 @@ One route on one day, its stops in the order the driver runs them. This is where
 3. **Load Seq** is the stop's load sequence: where its product sits on the truck. Load 1 goes on first, at the front; the highest number is at the back door. Type a new number to change it; the truck load map's spots with the old number change to the new one.
 4. **Stop note** is a note for this stop on this day (the customer's own notes, on its card, show on every day).
 5. `Edit` on a stop opens its edit box. On the left are two parts. **Days on route …**: untick a day to take the stop off this route on that day only, or tick a day to add it to this route, then press `Save`. **Move to another route**: pick the route in **To route**, tick the days to move (the day you are looking at is ticked), and press `Move to route …`. It comes off this route on those days and goes on the new route, placed by its load sequence; its other days stay here. On the right: the **Note for this stop** (this route and day only) and the **Notes for the driver** (every day). `Take off route …` (press it twice) takes the customer off this route on every day.
-6. On the right: the **Start time**, the **Instructions for this route day**, `Add a stop` (pick a customer) and a small copy of the **Truck load map** (`Change the load map` opens it).
+6. On the right: the **Start time**, the **Instructions for this route day**, `Add a stop` (pick a customer of this plant's own distribution center) and a small copy of the **Truck load map** (`Change the load map` opens it).
 7. `Load Map` opens the truck load map in its own window: the truck, the customers and their load sequence, nothing else. Change the run order, a load sequence or the truck there, and this screen shows it at once (and the other way round).
 8. `Print` opens the print menu: this route day for the office, the driver's route book page (with keys, Time in and Time out boxes, the instructions and the load map), this route day's load map, every day of this route, every route on this day, or the whole route book.
 

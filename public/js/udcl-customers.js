@@ -45,8 +45,16 @@ const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day 
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
 // Joe 11/2: a Group column on the Directory, picked from a drop-down, with a new group added from the same list.
 const groupsNow = () => [...new Set(Object.values(data.customers).map(c => c.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+// The group list is worked out once per drawing (Joe 11/2: with 5,118 customers, once per line made the screen crawl).
+let groupList = [];
 const groupCell = (c) => !data.canEdit ? e(c.group || '') : '<select class="grp" data-key="' + e(c.key) + '" aria-label="Group for ' + e(c.name) + '"><option value="">No group</option>' +
-  groupsNow().map(g => '<option' + (g === c.group ? ' selected' : '') + '>' + e(g) + '</option>').join('') + '<option value="+">+ Add a group…</option></select>';
+  groupList.map(g => '<option' + (g === c.group ? ' selected' : '') + '>' + e(g) + '</option>').join('') + '<option value="+">+ Add a group…</option></select>';
+// Only the first lines are drawn; "Show more" adds the next ones. Narrowing the boxes starts again from the top.
+const PAGE = 300;
+let shown = PAGE;
+const page = (rows) => rows.slice(0, shown);
+const moreRow = (rows, cols) => rows.length > shown ? '<tr class="more"><td colspan="' + cols + '">Showing ' + shown.toLocaleString() + ' of ' + rows.length.toLocaleString() +
+  ' &nbsp; <button type="button" data-more="' + PAGE + '">Show ' + Math.min(PAGE, rows.length - shown) + ' more</button> <button type="button" data-more="all">Show all</button></td></tr>' : '';
 // Joe 11/2: the Directory tab, "just ... the customer list with the addresses and the GPS coordinates ... and the phone numbers. Not the routes".
 const gpsText = (c) => (c.lat && c.lon) ? Number(c.lat).toFixed(5) + ', ' + Number(c.lon).toFixed(5) : '';
 const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone], ['Address check', c => c.addressCheck || '']];
@@ -60,25 +68,26 @@ function draw() {
   ['route', 'day'].forEach(id => { $(id).closest('.field').hidden = view === 'list' || master; });
   if (!data) return;
   const fl = f();
+  groupList = groupsNow();
   drawFooter();
   if (master) {
     drawMaster();
     // Joe 11/2: "Put the headers in it": the master file's own headings, one line per customer.
     const rows = customersShown();
     $('thead').innerHTML = '<tr>' + addrCols.map(c => '<th' + (c[2] ? '' : ' class="l"') + (c[3] ? ' style="width:' + c[3] + '"' : '') + '>' + e(c[0]) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '">' + addrCols.map(col => {
+    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '">' + addrCols.map(col => {
       const v = col[1](c);
       if (col[0] === 'Latitude' && v !== '') return '<td><a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(v) + '</a></td>';
       return '<td' + (col[2] ? '' : ' class="l"') + (col[4] ? ' title="' + e(v) + '"' : '') + '>' + (col[0] === 'Customer' ? '<b>' + e(v) + '</b>' : col[0] === 'Street' && !v ? '<span class="warnline">No address yet</span>' : e(v)) + '</td>';
-    }).join('') + '</tr>').join('') ||
+    }).join('') + '</tr>').join('') + moreRow(rows, addrCols.length) ||
       '<tr><td colspan="' + addrCols.length + '" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length.toLocaleString() + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'list') {
     const rows = customersShown();
     $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:18%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
+    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
-      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td><td class="l" title="' + e([c.addressNote, c.addressProposed && ('Proposed: ' + c.addressProposed), c.gpsFrom && ('GPS from ' + c.gpsFrom)].filter(Boolean).join(' · ')) + '"><small>' + e(c.addressCheck || '') + '</small></td></tr>').join('') ||
+      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td><td class="l" title="' + e([c.addressNote, c.addressProposed && ('Proposed: ' + c.addressProposed), c.gpsFrom && ('GPS from ' + c.gpsFrom)].filter(Boolean).join(' · ')) + '"><small>' + e(c.addressCheck || '') + '</small></td></tr>').join('') + moreRow(rows, 9) ||
       '<tr><td colspan="9" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
@@ -86,9 +95,9 @@ function draw() {
     // Joe 11/2: Chain and the day columns narrower again, and the Group drop-down here too.
     $('thead').innerHTML = '<tr><th style="width:4%">Chain</th><th class="l" style="width:11%">Group</th><th style="width:7%">Account</th><th class="l" style="width:17%">Customer</th><th style="width:7%">DC</th><th class="l">Address</th>' +
       U.DAYS.map(d => '<th class="dayroute" style="width:3.9%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
+    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
-      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') ||
+      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') + moreRow(rows, 13) ||
       '<tr><td colspan="13" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else {
@@ -117,9 +126,9 @@ const emptyText = () => data.canImport ? 'The customer list is empty. Press Uplo
    "Customer address list is where this file should be updated into. Put the headers in it.") ---------- */
 const fixed = (v) => v ? Number(v).toFixed(6) : '';
 const addrCols = [['DC', c => U.dcOf(c.dc), 1, '3.5%'], ['Chain', c => c.chain, 1, '3.5%'], ['Account', c => c.account, 1, '5.5%'], ['Customer', c => c.name, 0, '13%', 1],
-  ['Street', c => c.address, 0, '12%', 1], ['Second line', c => c.address2, 0, '6%', 1], ['City', c => c.city, 0, '8%'], ['State', c => c.state, 1, '3.5%'], ['ZIP', c => c.zip, 1, '4.5%'],
+  ['Street', c => c.address, 0, '12%', 1], ['Second line', c => c.address2, 0, '6%', 1], ['City', c => c.city, 0, '8%'], ['State', c => c.state, 1, '3.5%'], ['ZIP', c => c.zip, 1, '6%'],
   ['Latitude', c => c.lat && c.lon ? fixed(c.lat) : '', 1, '6%'], ['Longitude', c => c.lat && c.lon ? fixed(c.lon) : '', 1, '6%'], ['Phone', c => c.phone, 0, '7%'],
-  ['Match status', c => c.addressCheck || '', 0, '9%', 1], ['Matched address', c => c.addressProposed || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '8%', 1]];
+  ['Match status', c => c.addressCheck || '', 0, '9%', 1], ['Matched address', c => c.addressProposed || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '6.5%', 1]];
 let masterFor = null;
 function drawMaster() {
   if (masterFor === data && $('master').innerHTML) return;   // keep the picked file while the boxes narrow the list
@@ -284,8 +293,12 @@ function setData(d) {
   rebuild();
 }
 
-document.querySelectorAll('#views button').forEach(b => { b.onclick = () => { view = b.dataset.view; $('sort').value = ''; history.replaceState(null, '', '?view=' + view); draw(); }; });
-['q', 'route', 'day', 'chain', 'dcpick', 'sort'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', draw));
+document.querySelectorAll('#views button').forEach(b => { b.onclick = () => { view = b.dataset.view; $('sort').value = ''; shown = PAGE; history.replaceState(null, '', '?view=' + view); draw(); }; });
+let typing = null;
+['q', 'route', 'day', 'chain', 'dcpick', 'sort'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', () => {
+  shown = PAGE; clearTimeout(typing);
+  if (id === 'q') typing = setTimeout(draw, 200); else draw();
+}));
 async function saveGroup(key, group) {
   try { const out = await saveStep('saveCustomer', { key, fields: { group } }); data.customers[key] = out.customer; showError(''); }
   catch (err) { showError(serverText(err, 'the customer list')); }
@@ -305,7 +318,10 @@ $('rows').addEventListener('change', ev => {
     box.addEventListener('blur', finish);
   }
 });
-$('rows').addEventListener('click', ev => { if (ev.target.closest('a, select, input')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
+$('rows').addEventListener('click', ev => {
+  const more = ev.target.closest('button[data-more]');
+  if (more) { shown = more.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); return; }
+  if (ev.target.closest('a, select, input, button')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
 $('add').onclick = () => openCustomer(null);
 $('import').onclick = openImport;
 printMenu($('udcl-print-menu'), printItems);
