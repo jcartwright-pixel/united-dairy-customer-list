@@ -320,7 +320,7 @@ test('Import Addresses reads a sheet of checked addresses by its headings; only 
     ['', '', '', '', 'no account', '1 X St', 'Y', 'PA', '', ''],
     ['', '', 5003, '', 'no street', '', 'Y', 'PA', '', '']
   ]);
-  assert.deepEqual(rows, [{ key: '5002', address: '3349 Pittsburgh St', address2: '', city: 'Perryopolis', state: 'PA', zip: '15473', confidence: 'high', source: 'store site' }]);
+  assert.deepEqual(rows, [{ key: '5002', address: '3349 Pittsburgh St', address2: '', city: 'Perryopolis', state: 'PA', zip: '15473', confidence: 'high', source: 'store site', dc: '', name: 'BEST FOODS #2', chain: '415' }]);
   assert.deepEqual(U.checkedAddressRows([['DAY', 'ROUTE']]), []);
   const { db } = await imported();
   await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importAddresses', rows }), /Only an administrator/);
@@ -392,4 +392,24 @@ test('Joe 11/2: the master file ("Replace whatever I have with this") replaces n
   assert.equal(v.customers['5002-C418'].name, 'BEST FOODS #2 ANNEX', 'the same account under another chain is its own customer');
   assert.equal(v.customers['5002-C418'].addressNote, 'Look it up');
   assert.equal(v.customers['D1-50'].addressProposed, '9 FAR ROAD, FARTOWN, OH, 43950');
+});
+
+test('Joe 11/2: Import Addresses with a DC column finds the customer by DC and account, never a Uniontown customer with the same number', async () => {
+  const sheet = [['DC', 'Account', 'Customer', 'Street', 'City', 'State', 'Zip', 'Confidence', 'Source'],
+    [1, 5001, 'OTHER DC STORE', '12 RIVER RD', 'FARTOWN', 'OH', 43950, 'high', 'store site'],
+    [30, 5002, 'BEST FOODS #2', '3349 PITTSBURGH ST', 'PERRYOPOLIS', 'PA', 15473, 'high', 'store site']];
+  assert.deepEqual(U.fullListRows(sheet), [], 'a looked-up address sheet is not the master list');
+  const rows = U.checkedAddressRows(sheet);
+  assert.equal(rows[0].dc, '1');
+  const { db } = await imported();
+  await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: U.fullListRows([['DC', 'CHAIN', 'ACCOUNT', 'NAME'], [1, 0, 5001, 'OTHER DC STORE', '9 FAR RD', '', 'FARTOWN', 'OH', 43950]]) }, now);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'importAddresses', rows }, now);
+  assert.equal(out.counts.changed, 2);
+  const v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.equal(v.customers['D1-5001'].address, '12 RIVER RD');
+  assert.equal(v.customers['5001'].address, '1 MAIN ST', 'Uniontown 5001 is not touched');
+  assert.equal(v.customers['5002'].address, '3349 PITTSBURGH ST');
+  // A master upload afterwards keeps the looked-up address.
+  await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: U.fullListRows([['DC', 'CHAIN', 'ACCOUNT', 'NAME'], [1, 0, 5001, 'OTHER DC STORE', '9 FAR RD', '', 'FARTOWN', 'OH', 43950]]) }, now);
+  assert.equal((await S.udclCall(db, boss, PLANT, { op: 'view' })).customers['D1-5001'].address, '12 RIVER RD');
 });

@@ -405,6 +405,8 @@
       var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt === undefined ? -1 : dflt; };
       var dc = at(['DC']), acct = at(['ACCOUNT']), name = at(['NAME', 'CUSTOMER']), chain = at(['CHAIN']);
       if (dc < 0 || acct < 0 || name < 0) continue;
+      // A sheet of looked-up ship-to addresses (it has a Confidence column) is not the master list: Import Addresses reads it.
+      if (cells.indexOf('CONFIDENCE') >= 0) return [];
       var a1 = at(['ORIGINAL STREET', 'ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1'], name + 1), a2 = at(['ORIGINAL SECOND LINE', 'ADDRESS 2', 'STREET 2'], name + 2),
         city = at(['ORIGINAL CITY', 'CITY'], name + 3), st = at(['ORIGINAL STATE', 'STATE', 'ST'], name + 4), zip = at(['ORIGINAL ZIP', 'ZIP', 'ZIP CODE'], name + 5),
         lat = at(['LATITUDE', 'LAT']), lon = at(['LONGITUDE', 'LON', 'LNG']), check = at(['MATCH STATUS']), note = at(['REVIEW NOTES']), prop = at(['MATCHED ADDRESS']),
@@ -439,12 +441,15 @@
       var acct = col(['ACCOUNT', 'ACCT']), street = col(['SHIP-TO STREET', 'SHIP TO STREET', 'STREET', 'ADDRESS']), city = col(['CITY']);
       if (acct < 0 || street < 0 || city < 0) continue;
       var st = col(['STATE', 'ST']), zip = col(['ZIP']), s2 = col(['STREET 2', 'ADDRESS 2']), conf = col(['CONFIDENCE']), src = col(['SOURCE', 'WHERE IT CAME FROM']);
+      // Joe 11/2: every DC is on the list, and account numbers repeat across DCs: read the DC (and name, chain) when the sheet has them.
+      var dcc = col(['DC']), nmc = col(['CUSTOMER', 'NAME']), chc = col(['CHAIN']);
       var out = [];
       for (var i = r + 1; i < rows.length; i++) {
         var row = rows[i] || [], key = numText(row[acct], LIMITS.account), a = text(row[street], LIMITS.address);
         if (!key || !a) continue;
         out.push({ key: key, address: a, address2: s2 >= 0 ? text(row[s2], LIMITS.address) : '', city: text(row[city], LIMITS.city), state: st >= 0 ? text(row[st], LIMITS.state).toUpperCase() : '',
-          zip: zip >= 0 ? numText(row[zip], LIMITS.zip) : '', confidence: conf >= 0 ? text(row[conf], 20) : '', source: src >= 0 ? text(row[src], 200) : '' });
+          zip: zip >= 0 ? numText(row[zip], LIMITS.zip) : '', confidence: conf >= 0 ? text(row[conf], 20) : '', source: src >= 0 ? text(row[src], 200) : '',
+          dc: dcc >= 0 ? numText(row[dcc], 6).replace(/^0+(?=\d)/, '') : '', name: nmc >= 0 ? text(row[nmc], LIMITS.name) : '', chain: chc >= 0 ? numText(row[chc], LIMITS.chain) : '' });
       }
       return out;
     }

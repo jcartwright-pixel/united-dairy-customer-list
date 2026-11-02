@@ -320,8 +320,21 @@ async function loadAddresses(db, plant, rows, by, stamp) {
   const now = await readPlant(db, plant);
   let changed = 0, same = 0, missing = 0, refused = 0;
   const writes = [];
+  // Joe 11/2: a sheet with a DC column finds the customer by DC and account (account numbers repeat across DCs and chains), and
+  // by name or chain when the account is there more than once.
+  const plantDc = U.PLANT_DC[plant] || '';
+  const byDcAcct = {};
+  Object.values(now.customers).forEach(c => { const k = (U.dcOf(c.dc) || plantDc) + '|' + (c.account || ''); (byDcAcct[k] = byDcAcct[k] || []).push(c); });
+  const find = (r) => {
+    const acct = U.numText(r.account || r.key, U.LIMITS.account), dc = U.dcOf(r.dc);
+    if (!dc) return now.customers[U.text(r.key, 60)];
+    const list = byDcAcct[dc + '|' + acct] || [];
+    if (list.length < 2) return list[0];
+    const nm = U.text(r.name).toUpperCase();
+    return list.find(c => String(c.name || '').toUpperCase() === nm) || list.find(c => r.chain && c.chain === r.chain) || null;
+  };
   (Array.isArray(rows) ? rows : []).forEach(r => {
-    const key = U.text(r && r.key, 60), before = now.customers[key];
+    const before = r && find(r), key = before && before.key;
     if (!before) { missing++; return; }
     const fields = U.cleanCustomer({ address: r.address, address2: r.address2 || '', city: r.city, state: r.state, zip: r.zip });
     if (!fields.address || U.notStreet(fields.address) || U.notStreet(fields.address2)) { refused++; return; }
@@ -390,7 +403,8 @@ async function importFullList(db, plant, email, input, stamp) {
     after.name = x.name; after.chain = x.chain; after.dc = x.dc;
     const got = U.cleanCustomer({ address: r.address, address2: r.address2 || '', city: r.city, state: r.state, zip: r.zip });
     if (U.notStreet(got.address2)) got.address2 = '';
-    const keepStreet = !got.address || (U.notStreet(got.address) && after.address && !U.notStreet(after.address));
+    // A looked-up ship-to address (addressChecked, Joe picked "keep them" on 11/2) stays; a street is never replaced by a PO box.
+    const keepStreet = after.addressChecked || !got.address || (U.notStreet(got.address) && after.address && !U.notStreet(after.address));
     if (!keepStreet) {
       if (got.address !== after.address || got.city !== after.city) { after.lat = null; after.lon = null; }
       ['address', 'address2', 'city', 'state', 'zip'].forEach(k => { after[k] = got[k] || ''; });
@@ -406,9 +420,11 @@ async function importFullList(db, plant, email, input, stamp) {
     writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), before, after]);
   });
   // A customer from an earlier full list that this one no longer has, and that is on no route, goes.
+  // Only a whole list clears the old one: a file much smaller than the list here (a part of it, a wrong sheet) removes nothing.
+  const listedNow = Object.values(now.customers).filter(c => c.onCompanyList).length, whole = clean.length >= listedNow * 0.8;
   Object.keys(now.customers).forEach(key => {
     const c = now.customers[key];
-    if (!c.onCompanyList || used.has(key) || onRoute.has(key)) return;
+    if (!whole || !c.onCompanyList || used.has(key) || onRoute.has(key)) return;
     removed++;
     writes.push(['delete', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), c, null]);
   });
