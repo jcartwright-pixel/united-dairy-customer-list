@@ -112,7 +112,9 @@ async function saveRouteDay(db, plant, email, input, stamp) {
  */
 async function placeStop(db, plant, email, input, stamp) {
   const key = U.text(input.key, 60), from = U.numText(input.from, U.LIMITS.route), route = U.numText(input.route, U.LIMITS.route) || from;
-  const day = U.dayOf(input.day), days = [...new Set((Array.isArray(input.days) ? input.days : []).map(U.dayOf).filter(Boolean))];
+  const day = U.dayOf(input.day), dayList = (v) => [...new Set((Array.isArray(v) ? v : []).map(U.dayOf).filter(Boolean))];
+  // days: the days it is on `route` afterwards. stay (Joe 11/2, a move to another route): the days it keeps on `from`.
+  const days = dayList(input.days), stay = route !== from ? dayList(input.stay) : [];
   if (!key || !from || !route) fail('BAD_REQUEST', 'Pick a customer and a route.');
   const loadSeq = input.loadSeq === undefined ? undefined : U.seqOf(input.loadSeq), note = input.note === undefined ? undefined : U.text(input.note, U.LIMITS.note);
   const cref = db.collection(CUSTOMERS).doc(U.customerId(plant, key));
@@ -142,7 +144,7 @@ async function placeStop(db, plant, email, input, stamp) {
           stops[at] = Object.assign({}, stops[at], loadSeq !== undefined ? { loadSeq } : {}, note !== undefined ? { note } : {});
         } else return;
       } else {
-        if (r !== from || at < 0) return;
+        if (r !== from || at < 0 || stay.includes(d)) return;
         stops.splice(at, 1);
       }
       const after = Object.assign({ plant, route: r, day: d, stops: [], startTime: '', notes: '', map: null, rev: 0 }, before || {});

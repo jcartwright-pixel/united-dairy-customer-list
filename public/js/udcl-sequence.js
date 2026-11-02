@@ -124,57 +124,76 @@ function openEdit(i) {
   closeEdit();
   const m = document.createElement('div');
   m.id = 'edit'; m.className = 'udcl-modal';
+  const others = routesOf(data.routeDays).filter(r => r !== route);
   m.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="ed-title"><header><h2 id="ed-title">' + e(name) + (c.account ? ' <small>#' + e(c.account) + '</small>' : '') + '</h2><button type="button" id="ed-close">Close</button></header>' +
     '<div class="cols"><div class="left">' +
-      '<label>Route<select id="ed-route">' + routesOf(data.routeDays).map(r => '<option value="' + e(r) + '"' + (r === route ? ' selected' : '') + '>Route ' + e(r) + '</option>').join('') + '</select></label>' +
-      '<div class="lbl">Delivery days on this route<small>Tick a day to add the stop, untick to take it off that day.</small></div><div class="ed-days" id="ed-days"></div>' +
-      '<p class="ed-what" id="ed-what"></p>' +
+      // Joe 11/2: two plain jobs. 1) the days it is on THIS route; 2) move it to another route.
+      '<section class="ed-part"><h3>Days on route ' + e(route) + '</h3><small>Untick a day to take it off route ' + e(route) + ' on that day only. Tick a day to add it to route ' + e(route) + '. Press Save.</small><div class="ed-days" id="ed-days"></div><p class="ed-what" id="ed-what"></p></section>' +
+      '<section class="ed-part"><h3>Move to another route</h3><label>To route<select id="mv-route"><option value="">Pick a route</option>' + others.map(r => '<option value="' + e(r) + '">Route ' + e(r) + '</option>').join('') + '</select></label>' +
+        '<div class="lbl">Move these days</div><div class="ed-days" id="mv-days"></div><p class="ed-what" id="mv-what"></p><button type="button" class="primary" id="mv-go" disabled>Move</button></section>' +
       '<button type="button" class="danger" id="ed-off">Take off route ' + e(route) + ' (every day)</button>' +
     '</div><div class="right">' +
       '<label>Note for this stop<small>Route ' + e(route) + ', ' + U.DAY_NAMES[day] + ' only</small><textarea id="ed-note" maxlength="' + U.LIMITS.note + '">' + e(s.note || '') + '</textarea></label>' +
       '<label>Notes for the driver<small>On every day and route (the customer\'s card)</small><textarea id="ed-cnotes" maxlength="' + U.LIMITS.notes + '">' + e(c.notes || '') + '</textarea></label>' +
     '</div></div><footer><span id="ed-msg"></span><button type="button" id="ed-cancel">Cancel</button><button type="button" class="primary" id="ed-save">Save</button></footer></div>';
   document.body.appendChild(m);
-  let picked = new Set(daysOn(route));
+  const onNow = daysOn(route);
+  const picked = new Set(onNow), moving = new Set([day]);
+  const boxes = (set, only) => U.DAYS.map(d => '<label class="ed-day' + (only && !only.includes(d) ? ' off' : '') + '"><input type="checkbox" value="' + d + '"' + (set.has(d) ? ' checked' : '') + (only && !only.includes(d) ? ' disabled' : '') + '>' + U.DAY_NAMES[d].slice(0, 3) + '</label>').join('');
   const drawDays = () => {
-    const r = $('ed-route').value;
-    $('ed-days').innerHTML = U.DAYS.map(d => '<label class="ed-day"><input type="checkbox" value="' + d + '"' + (picked.has(d) ? ' checked' : '') + '>' + U.DAY_NAMES[d].slice(0, 3) + '</label>').join('');
-    const off = daysOn(route).filter(d => r !== route || !picked.has(d)), on = [...picked].filter(d => !rdOf(r, d) || !(rdOf(r, d).stops || []).some(t => t.key === s.key));
-    const say = [];
-    if (r !== route) say.push('Moves to route ' + r + '.');
+    $('ed-days').innerHTML = boxes(picked);
+    const off = onNow.filter(d => !picked.has(d)), on = [...picked].filter(d => !onNow.includes(d)), say = [];
     if (off.length) say.push('Comes off route ' + route + ' on ' + off.map(d => U.DAY_NAMES[d]).join(', ') + '.');
-    if (on.length) say.push('Goes on route ' + r + ' on ' + on.map(d => U.DAY_NAMES[d]).join(', ') + ' (placed by its load sequence, ' + (s.loadSeq || 'none') + ').');
+    if (on.length) say.push('Goes on route ' + route + ' on ' + on.map(d => U.DAY_NAMES[d]).join(', ') + '.');
     $('ed-what').textContent = say.join(' ');
   };
-  // A different route starts with the same days ticked, so "move to route 805" keeps the days.
-  $('ed-route').onchange = () => { if ($('ed-route').value === route) picked = new Set(daysOn(route)); drawDays(); };
+  const drawMove = () => {
+    const r = $('mv-route').value, list = [...moving].filter(d => onNow.includes(d));
+    $('mv-days').innerHTML = boxes(moving, onNow);
+    $('mv-go').disabled = !r || !list.length;
+    $('mv-go').textContent = r ? 'Move to route ' + r : 'Move';
+    const stay = onNow.filter(d => !moving.has(d));
+    $('mv-what').textContent = !r ? 'Pick the route it goes to, then the days to move.' : !list.length ? 'Tick at least one day.' :
+      'Comes off route ' + route + ' and goes on route ' + r + ' on ' + list.map(d => U.DAY_NAMES[d]).join(', ') + '.' + (stay.length ? ' It stays on route ' + route + ' on ' + stay.map(d => U.DAY_NAMES[d]).join(', ') + '.' : '');
+  };
   $('ed-days').onchange = (ev) => { const b = ev.target; if (b.checked) picked.add(b.value); else picked.delete(b.value); drawDays(); };
-  drawDays();
+  $('mv-days').onchange = (ev) => { const b = ev.target; if (b.checked) moving.add(b.value); else moving.delete(b.value); drawMove(); };
+  $('mv-route').onchange = drawMove;
+  drawDays(); drawMove();
   const msg = (t, bad) => { $('ed-msg').textContent = t || ''; $('ed-msg').className = bad ? 'bad' : ''; };
+  const keep = (out) => out.changed.forEach(x => { const k = data.routeDays.findIndex(y => y.route === x.route && y.day === x.day); if (k >= 0) data.routeDays[k] = x; else data.routeDays.push(x); });
+  const notes = async () => { const cnotes = $('ed-cnotes').value.trim(); if (cnotes !== (c.notes || '')) { const out = await saveStep('saveCustomer', { key: s.key, fields: { notes: cnotes } }); data.customers[s.key] = out.customer; } };
+  const done = () => { announceChange(route, day); closeEdit(); draw(); showError(''); };
   const apply = async (days) => {
-    const r = $('ed-route').value, note = $('ed-note').value.trim(), cnotes = $('ed-cnotes').value.trim();
-    const moved = r !== route || U.DAYS.some(d => picked.has(d) !== daysOn(route).includes(d)) || days;
+    const note = $('ed-note').value.trim(), want = days || [...picked];
+    const moved = U.DAYS.some(d => want.includes(d) !== onNow.includes(d));
     msg('Saving…');
     await saving;
     try {
-      if (moved) {
-        const out = await saveStep('placeStop', { key: s.key, from: route, route: r, day, days: days || [...picked], note });
-        out.changed.forEach(x => { const k = data.routeDays.findIndex(y => y.route === x.route && y.day === x.day); if (k >= 0) data.routeDays[k] = x; else data.routeDays.push(x); });
-      } else if (note !== (s.note || '')) {
+      if (moved) keep(await saveStep('placeStop', { key: s.key, from: route, route, day, days: want, note }));
+      else if (note !== (s.note || '')) {
         const list = stopsNow(); list[i].note = note;
         const out = await saveStep('saveRouteDay', { route, day, rev: current().rev, stops: list });
         data.routeDays[data.routeDays.indexOf(current())] = out.routeDay;
       }
-      if (cnotes !== (c.notes || '')) { const out = await saveStep('saveCustomer', { key: s.key, fields: { notes: cnotes } }); data.customers[s.key] = out.customer; }
-      announceChange(route, day);
-      closeEdit(); draw(); showError('');
+      await notes(); done();
+    } catch (err) { msg(serverText(err, 'the customer list'), true); }
+  };
+  $('mv-go').onclick = async () => {
+    const r = $('mv-route').value, list = [...moving].filter(d => onNow.includes(d));
+    if (!r || !list.length) return;
+    msg('Moving…');
+    await saving;
+    try {
+      keep(await saveStep('placeStop', { key: s.key, from: route, route: r, day, days: list, stay: onNow.filter(d => !list.includes(d)), note: $('ed-note').value.trim() }));
+      await notes(); done();
     } catch (err) { msg(serverText(err, 'the customer list'), true); }
   };
   $('ed-save').onclick = () => apply(null);
   $('ed-off').onclick = () => {
     const b = $('ed-off');
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Press again to take ' + name + ' off route ' + route; return; }
-    $('ed-route').value = route; apply([]);
+    apply([]);
   };
   $('ed-close').onclick = $('ed-cancel').onclick = closeEdit;
   m.onclick = (ev) => { if (ev.target === m) closeEdit(); };

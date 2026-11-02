@@ -223,6 +223,13 @@ test('Joe 11/2: Edit on Route Book moves a stop to other days and another route,
   assert.equal(rd(v, '900', 'WED').stops[0].loadSeq, 4);
   assert.ok(rd(v, '900', 'WED').map, 'a new route day gets a load map');
   assert.equal(rd(v, '900', 'FRI').stops.some(s => s.key === '5001'), false);
+  // Joe 11/2 "Move to another route": move Wednesday only to 902 (stay on 900 Tuesday), then bring it back.
+  await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '900', route: '902', day: 'WED', days: ['WED'], stay: ['TUE'] }, now);
+  v = await view();
+  assert.equal(rd(v, '900', 'TUE').stops.some(s => s.key === '5001'), true, 'Tuesday stays on 900');
+  assert.equal(rd(v, '900', 'WED').stops.some(s => s.key === '5001'), false);
+  assert.deepEqual(rd(v, '902', 'WED').stops.map(s => s.key), ['5001']);
+  await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '902', route: '900', day: 'WED', days: ['WED'] }, now);
   // Move it to route 901 on Wednesday: off 900 everywhere, on 901 Wednesday (load 4 goes before DAIRY DELITE, which has none).
   await S.udclCall(db, mgr, PLANT, { op: 'placeStop', key: '5001', from: '900', route: '901', day: 'TUE', days: ['WED'] }, now);
   v = await view();

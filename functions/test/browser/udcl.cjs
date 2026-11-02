@@ -193,18 +193,24 @@ async function ph0(browser) {
     await q.click('#rows button[data-ed="' + at + '"]');
     await q.waitForSelector('#edit .ed-days input');
     assert.deepEqual(await q.$$eval('#ed-days input:checked', x => x.map(i => i.value)), ['TUE']);
-    await q.selectOption('#ed-route', '805');
-    await q.uncheck('#ed-days input[value="TUE"]');
-    await q.check('#ed-days input[value="THU"]');
-    assert.match(await q.textContent('#ed-what'), /Moves to route 805\. Comes off route 803 on Tuesday\. Goes on route 805 on Thursday/);
+    // Days on route 803: tick Wednesday, the box says so (not saved: the move below is what this test does).
+    await q.check('#ed-days input[value="WED"]');
+    assert.match(await q.textContent('#ed-what'), /Goes on route 803 on Wednesday/);
+    await q.uncheck('#ed-days input[value="WED"]');
+    // Move to another route: Tuesday (the day shown) is ticked; pick 805.
+    assert.deepEqual(await q.$$eval('#mv-days input:checked', x => x.map(i => i.value)), ['TUE']);
+    assert.equal(await q.isDisabled('#mv-go'), true);
+    await q.selectOption('#mv-route', '805');
+    assert.match(await q.textContent('#mv-what'), /Comes off route 803 and goes on route 805 on Tuesday\./);
+    assert.equal(await q.textContent('#mv-go'), 'Move to route 805');
     await q.fill('#ed-cnotes', 'Back door after 6');
     await shot(q, 'udcl-1920-edit-stop');
-    await q.click('#ed-save');
+    await q.click('#mv-go');
     await q.waitForSelector('#edit', { state: 'detached' });
     await q.waitForFunction(() => !document.querySelector('#rows tr[data-drag="1526"]'));
     const tue803 = (await db().collection('udclRouteDays').doc('fac_uniontown__803__TUE').get()).data().stops.map(x => x.key);
     assert.equal(tue803.includes('1526'), false);
-    assert.ok((await db().collection('udclRouteDays').doc('fac_uniontown__805__THU').get()).data().stops.some(x => x.key === '1526'));
+    assert.ok((await db().collection('udclRouteDays').doc('fac_uniontown__805__TUE').get()).data().stops.some(x => x.key === '1526'));
     assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__1526').get()).data().notes, 'Back door after 6');
     const [win] = await Promise.all([q.waitForEvent('popup'), q.click('#open-map')]);
     await win.waitForSelector('#rows input.lm-seq');
