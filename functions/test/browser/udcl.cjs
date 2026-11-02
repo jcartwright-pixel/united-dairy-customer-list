@@ -65,9 +65,10 @@ async function ph0(browser) {
     await p.goto(p.emailFor('customers.html'));
     await p.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await p.textContent('#count'), '9 customers');
-    // Joe 11/2: Chain, Account, Customer, DC, Address, then Sun..Sat holding that day's route (no stop number).
-    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Chain', 'Account', 'Customer', 'DC', 'Address', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] td', x => x.slice(1).map(t => t.textContent)), ['1196', await p.textContent('#rows tr[data-key="1196"] td:nth-child(3)'), 'Uniontown', '12 ELM ST, MAPLETON, PA 15401', '', '', '803', '', '', '803', '']);
+    // Joe 11/2: Chain, Group, Account, Customer, DC, Address, then Sun..Sat holding that day's route (no stop number).
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Chain', 'Group', 'Account', 'Customer', 'DC', 'Address', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.ok(await p.$('#rows tr[data-key="1196"] select.grp'), 'the Group drop-down is on By Customer');
+    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] td', x => x.slice(2).map(t => t.textContent)), ['1196', 'ACORN CORNER MARKET', 'Uniontown', '12 ELM ST, MAPLETON, PA 15401', '', '', '803', '', '', '803', '']);
     await shot(p, 'udcl-1920-customers');
     await p.click('#views [data-view="route"]');
     await p.selectOption('#route', '805');
@@ -79,8 +80,9 @@ async function ph0(browser) {
     await p.selectOption('#day', 'TUE');
     assert.equal(await p.textContent('#count'), '5 deliveries');
     // Joe 11/2: the Directory tab: no routes, with GPS and phone.
-    await p.click('#views [data-view="list"]');
     await p.selectOption('#day', '');
+    await p.click('#views [data-view="list"]');
+    assert.equal(await p.isHidden('#day'), true, 'no Day box on the Directory');
     assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['DC', 'Chain', 'Group', 'Account', 'Customer', 'Address', 'GPS', 'Phone', 'Address check']);
     // Group: add a new group from the drop-down; it saves and then shows in every customer's list.
     await p.selectOption('#rows select.grp[data-key="1526"]', '+');
@@ -92,6 +94,21 @@ async function ph0(browser) {
     assert.equal(await p.textContent('#count'), '9 customers');
     assert.match(await p.textContent('#rows tr[data-key="1196"]'), /Uniontown.*1196.*12 ELM ST, MAPLETON, PA 15401/);
     await shot(p, 'udcl-1920-directory');
+    // Joe 11/2: the Master List tab: counts, and the master list upload (a made-up one: GPS, phone and a group for one customer).
+    await p.click('#views [data-view="master"]');
+    assert.equal(await p.isHidden('#table-wrap'), true);
+    assert.match(await p.textContent('#master .ml-stats'), /9\s*customers/);
+    await p.setInputFiles('#i-addr', { name: 'Made Up Master List.csv', mimeType: 'text/csv', buffer: Buffer.from('DC,Chain,Account,Customer,Street,City,State,Zip,Latitude,Longitude,Phone,Group\n30,0,1196,ACORN CORNER MARKET,12 ELM ST,MAPLETON,PA,15401,39.9,-79.7,555-0199,Corner Stores\n') });
+    // The Excel reader comes from the internet; a test machine stands in a small CSV reader for it.
+    await p.evaluate(() => { if (!window.XLSX) window.XLSX = { read: (buf) => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: new TextDecoder().decode(buf) } }), utils: { sheet_to_json: (t) => t.trim().split('\n').map(l => l.split(',')) } }; });
+    await p.click('#i-addr-go');
+    await p.waitForSelector('#i-msg .good, #i-msg .bad', { timeout: 60000 });
+    assert.ok(await p.$('#i-msg .good'), await p.textContent('#i-msg'));
+    const acorn = (await db().collection('udclCustomers').doc('fac_uniontown__1196').get()).data();
+    assert.equal(acorn.phone, '555-0199'); assert.equal(acorn.group, 'Corner Stores'); assert.equal(acorn.lat, 39.9);
+    assert.match(await p.textContent('#master'), /Last master list: Made Up Master List\.csv/);
+    assert.match(await p.textContent('#imported'), /Master list: Made Up Master List\.csv/);
+    await shot(p, 'udcl-1920-master-list');
     await p.click('#views [data-view="day"]');
     await p.selectOption('#day', 'TUE');
     await p.click('#rows tr[data-key="40463"]');

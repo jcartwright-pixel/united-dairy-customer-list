@@ -8,7 +8,7 @@ const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.m
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
 
 const params = new URLSearchParams(location.search);
-let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
+let data = null, view = ['customer', 'route', 'day', 'list', 'master'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
 let allLines = [];
 const $ = (id) => document.getElementById(id);
 const f = () => ({ q: $('q').value, route: $('route').value, day: $('day').value, chain: $('chain').value, dc: $('dcpick').value, sort: $('sort').value || view });
@@ -54,8 +54,14 @@ const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]
 
 function draw() {
   document.querySelectorAll('#views button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+  const master = view === 'master';
+  $('master').hidden = !master; $('table-wrap').hidden = master; $('bar').hidden = master;
+  // Route and Day mean nothing on the Directory: hide them there.
+  ['route', 'day'].forEach(id => { $(id).closest('.field').hidden = view === 'list'; });
   if (!data) return;
   const fl = f();
+  drawFooter();
+  if (master) return drawMaster();
   if (view === 'list') {
     const rows = customersShown();
     $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:18%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
@@ -66,12 +72,13 @@ function draw() {
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:8%">Account</th><th class="l" style="width:19%">Customer</th><th style="width:8%">DC</th><th class="l">Address</th>' +
-      U.DAYS.map(d => '<th class="dayroute" style="width:4.95%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
+    // Joe 11/2: Chain and the day columns narrower again, and the Group drop-down here too.
+    $('thead').innerHTML = '<tr><th style="width:4%">Chain</th><th class="l" style="width:11%">Group</th><th style="width:7%">Account</th><th class="l" style="width:17%">Customer</th><th style="width:7%">DC</th><th class="l">Address</th>' +
+      U.DAYS.map(d => '<th class="dayroute" style="width:3.9%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
+    $('rows').innerHTML = rows.map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
       U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') ||
-      '<tr><td colspan="12" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+      '<tr><td colspan="13" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else {
     const lines = U.pick(allLines, fl);
@@ -85,11 +92,64 @@ function draw() {
     }).join('') || '<tr><td colspan="8" class="empty">' + (allLines.length ? 'No delivery matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = lines.length + ' deliver' + (lines.length === 1 ? 'y' : 'ies');
   }
-  const im = data.imported;
-  $('imported').textContent = im ? 'Imported from ' + (im.fileName || 'the Route Menu') + ' on ' + shortDate(im.at) + ' by ' + im.by + ' · ' + (im.counts.customers || 0) + ' customers, ' + (im.counts.routeDays || 0) + ' route days' +
-    (im.counts.noLoadSeq ? ' · ' + im.counts.noLoadSeq + ' stops have no load sequence yet' : '') : '';
 }
-const emptyText = () => data.canImport ? 'The customer list is empty. Press Import Route Menu to bring in the Uniontown Route Menu workbook.' : 'The customer list is empty. An administrator imports it from the Route Menu workbook.';
+const lastUpload = (m) => m ? (m.fileName || 'a file') + ', ' + shortDate(m.at) + ' by ' + m.by : '';
+function drawFooter() {
+  const im = data.imported, ms = data.master;
+  $('imported').innerHTML = [im && '<span><b>Route Menu:</b> ' + e(lastUpload(im)) + ' · ' + (im.counts.customers || 0) + ' customers, ' + (im.counts.routeDays || 0) + ' route days' +
+    (im.counts.noLoadSeq ? ' · <span class="warnline">' + im.counts.noLoadSeq + ' stops have no load sequence yet</span>' : '') + '</span>',
+    ms && '<span><b>Master list:</b> ' + e(lastUpload(ms)) + '</span>'].filter(Boolean).join('');
+}
+const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on the Master List tab.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
+
+/* ---------- the Master List tab (Joe 11/2: "one more tab and that's where we're going to upload our master address list") ---------- */
+function drawMaster() {
+  const all = Object.values(data.customers), n = (fn) => all.filter(fn).length;
+  const stat = (num, label, warn) => '<div class="ml-stat' + (warn && num ? ' warn' : '') + '"><b>' + num.toLocaleString() + '</b><span>' + e(label) + '</span></div>';
+  const ms = data.master, as = data.addressSheet;
+  const last = (m, what) => m ? '<p class="ml-last">Last ' + what + ': <b>' + e(m.fileName || 'a file') + '</b>, ' + e(shortDate(m.at)) + ' by ' + e(m.by) +
+    (m.counts && m.counts.read !== undefined ? ' · ' + m.counts.read + ' read, ' + (m.counts.added || 0) + ' added, ' + (m.counts.changed || 0) + ' updated' : '') +
+    (m.counts && m.counts.changed !== undefined && m.counts.read === undefined ? ' · ' + m.counts.changed + ' changed' : '') + '</p>' : '<p class="ml-last">No ' + what + ' uploaded yet.</p>';
+  $('master').innerHTML = '<div class="ml-stats">' + stat(all.length, 'customers') + stat(n(c => c.lat && c.lon), 'with GPS') + stat(n(c => c.phone), 'with a phone') +
+    stat(n(c => !U.addressLine(c)), 'with no address yet', true) + stat(n(c => c.group), 'in a group') + '</div>' +
+    '<section class="ml-card"><h2>Upload the master list</h2>' +
+    '<p>The company\'s customer list for every distribution center: <b>DC, Chain, Account, Customer</b>, the address, and if you have them <b>Latitude, Longitude, Phone, Contact</b> and <b>Group</b>. ' +
+    'A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in here too; the screen tells which one you picked.</p>' +
+    (data.canImport ? '<div class="ml-pick"><input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv" aria-label="Master list file"><button type="button" class="primary" id="i-addr-go">Upload</button></div><div id="i-msg"></div>'
+      : '<p class="deliveries">An administrator uploads the master list.</p>') +
+    last(ms, 'master list') + last(as, 'checked addresses sheet') + '</section>' +
+    '<section class="ml-card"><h2>What an upload changes</h2><ul>' +
+    '<li><b>Changes:</b> each customer\'s name, chain, distribution center and address, and the GPS, phone, contact and group the file has.</li>' +
+    '<li><b>Adds</b> a customer the list does not have yet (with no route).</li>' +
+    '<li><b>Keeps:</b> routes, run and load order, notes, keys, and any phone or group the file leaves blank.</li>' +
+    '<li><b>Keeps</b> a checked ship-to address, and never puts a PO box, mailbox or c/o in place of a street.</li>' +
+    '<li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li></ul></section>';
+  if (data.canImport) $('i-addr-go').onclick = uploadMaster;
+}
+async function uploadMaster() {
+  const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
+  const file = $('i-addr').files[0];
+  if (!file) return say('Pick the master list file first.', 'bad');
+  const btn = $('i-addr-go'); btn.disabled = true;
+  try {
+    say('Reading ' + file.name + '…');
+    const X = await loadXlsx(), wb = X.read(await file.arrayBuffer(), { type: 'array' });
+    let full = [];
+    wb.SheetNames.some(n => (full = U.fullListRows(sheetRows(X, wb, n))).length);
+    if (full.length) {
+      say('Saving ' + full.length.toLocaleString() + ' customers from the master list. This can take a minute…');
+      const out = await saveStep('importFullList', { rows: full, fileName: file.name, thenView: true });
+      setData(out); return say(out.message, 'good');
+    }
+    let rows = [];
+    wb.SheetNames.some(n => (rows = U.checkedAddressRows(sheetRows(X, wb, n))).length);
+    if (!rows.length) return say('No sheet with DC, Account and Customer headings (the master list) or Account, Street and City headings (checked addresses) was found in ' + file.name + '.', 'bad');
+    say('Saving ' + rows.length + ' checked addresses…');
+    const out = await saveStep('importAddresses', { rows, fileName: file.name, thenView: true });
+    setData(out); say(out.message, 'good');
+  } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
+  finally { if ($('i-addr-go')) $('i-addr-go').disabled = false; }
+}
 
 /* ---------- a customer's card ---------- */
 function panel(title, body) {
@@ -142,14 +202,12 @@ function sheetRows(X, wb, name) { const ws = wb.Sheets[name]; return ws ? X.util
 function findSheet(wb, want) { return wb.SheetNames.find(n => n.trim().toLowerCase() === want.toLowerCase()); }
 
 function openImport() {
-  panel('Import the customer list', '<p>Pick the <b>Route Menu</b> workbook (it decides every customer, route, day and load sequence). Pick the <b>Route Book</b> too if you have it: its run order, start times, keys, instructions and truck drawings replace what is here.</p>' +
+  panel('Upload the Route Menu', '<p>Pick the <b>Route Menu</b> workbook (it decides every customer, route, day and load sequence). Pick the <b>Route Book</b> too if you have it: its run order, start times, keys, instructions and truck drawings replace what is here.</p>' +
     '<label>Route Menu workbook (.xlsb, .xlsx)<input type="file" id="i-menu" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
-    '<button type="button" class="primary" id="i-go">Read and import</button><div id="i-msg"></div><hr>' +
-    '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button>' +
-    '<p><b>Checked ship-to addresses</b>: a sheet with Account, Street, City, State and Zip headings (addresses looked up by the store\'s name, never a PO box). They replace the addresses here and stay through the next Route Menu upload.</p>' +
-    '<p><b>The company\'s full customer list</b> (DC, Chain, Account, Name, address, city, state, zip) goes in with the same button: a customer missing here is added with no route yet, and the others get their chain and address filled in. Only this plant\'s distribution center is read.</p>' +
-    '<label>Addresses sheet or full customer list (.xlsx, .csv, .txt)<input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv"></label><button type="button" id="i-addr-go">Import Addresses</button><hr>' +
+    '<button type="button" class="primary" id="i-go">Upload</button><div id="i-msg"></div>' +
+    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on the <b>Master List</b> tab.</p><hr>' +
+    '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
   $('i-go').onclick = async () => {
@@ -176,29 +234,6 @@ function openImport() {
       say(out.message + ' ' + c.added + ' new customers, ' + c.filled + ' had their address or keys filled in, ' + c.inactive + ' no longer on the Route Menu, ' + c.removedDays + ' route days removed.' + (c.noLoadSeq ? ' ' + c.noLoadSeq + ' stops have no load sequence in the Route Menu: give them one on Route Book.' : ''), 'good');
     } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
   };
-  $('i-addr-go').onclick = async () => {
-    const f = $('i-addr').files[0];
-    if (!f) return say('Pick the addresses sheet first.', 'bad');
-    try {
-      say('Reading ' + f.name + '…');
-      const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
-      // Joe 11/2: the company's full customer list (DC, CHAIN, ACCOUNT, NAME ...) goes in through the same button: missing customers are added.
-      let full = [];
-      wb.SheetNames.some(n => (full = U.fullListRows(sheetRows(X, wb, n))).length);
-      if (full.length) {
-        say('Reading ' + full.length + ' customers from the full list…');
-        const out = await saveStep('importFullList', { rows: full, fileName: f.name, thenView: true });
-        setData(out);
-        return say(out.message, 'good');
-      }
-      let rows = [];
-      wb.SheetNames.some(n => (rows = U.checkedAddressRows(sheetRows(X, wb, n))).length);
-      if (!rows.length) return say('No sheet with Account, Street and City headings was found in ' + f.name + '.', 'bad');
-      const out = await saveStep('importAddresses', { rows, thenView: true });
-      setData(out);
-      say(out.message, 'good');
-    } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
-  };
   $('i-sales').onclick = async () => {
     try { const out = await saveStep('copySales', { thenView: true }); setData(out); say(out.message, 'good'); } catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
   };
@@ -211,10 +246,10 @@ function printItems() {
   const lineCols = [['Day', l => dayName(l.day).slice(0, 3), 1], ['Route', l => l.route, 1], ['Run Seq', l => l.stop, 1], ['Load Seq', l => l.loadSeq || '', 1], ['Account', l => l.account], ['Customer', l => l.name], ['Address', l => U.addressLine(l)], ['Note', l => l.note]];
   const rds = sortedRouteDays(data.routeDays).filter(rd => (!fl.route || rd.route === fl.route) && (!fl.day || rd.day === fl.day));
   return [
-    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'list'
+    { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'list' || view === 'master'
       ? printDoc('Customer directory', [tablePage('Customer directory · ' + pn, filt || 'All customers', customersShown(), dirCols)])
       : view === 'customer'
-      ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])
+      ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])
       : printDoc('Deliveries', [tablePage('Deliveries · ' + pn, filt || 'All deliveries', U.pick(allLines, fl), lineCols, view === 'route' ? (l => 'Route ' + l.route + ' · ' + dayName(l.day)) : (l => dayName(l.day) + ' · Route ' + l.route))]) },
     { label: 'Route sequence sheets for the office', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + (filt ? ' (' + filt + ')' : '') + ', one page each', html: () => printDoc('Route sequence', rds.map(rd => routeDayPage(rd, data.customers, 'office', pn))) },
     { label: 'Driver route book pages', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + ', with keys, time in / out and the load map', html: () => printDoc('Route book', rds.map(rd => routeDayPage(rd, data.customers, 'driver', pn))) },

@@ -23,20 +23,19 @@ screens: customers.html
 
 The **United Dairy Customer List** (UDCL): the one list of every customer, the routes and days they get a delivery, and in what order. The Sales app and the drivers' route book read it from here. Each plant keeps its own list (Uniontown first).
 
-1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, group, account, name, address, GPS and phone; the GPS opens the spot in Google Maps).
-2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** and **Chain**. **Sort by** changes the order.
+1. Pick a tab: `By Customer` (one line per customer: chain, group, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, group, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). The `Master List` tab is where the master list is uploaded (see its own part of this guide).
+2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory`), **DC** and **Chain**. **Sort by** changes the order.
 3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
 4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
 
 ### Buttons
 
 - `+ Add Customer` (Administrators and Managers) adds a customer by account number and name. Then add it to a route day on **Route Book**.
-- `Import Route Menu` (Administrators): pick the **Route Menu** workbook, and the **Route Book** too if you have it, then `Read and import`. The Route Menu's **Customer By Route** tab decides every customer, route, day and load sequence; its **Address List** and **GPS Address** tabs fill in addresses. An address that was checked (looked up by the store's name and town, so it is where the truck goes) stays through the upload, and the upload never puts a PO box, mailbox, RR box or "c/o" address in place of a street address. The Route Book's run order, start times, keys and instructions replace what is here, and so does its truck drawing where the numbers still match. `Bring over the Sales app list` copies the list already uploaded for the Sales app instead.
-- **Group** (on `Directory`, Administrators and Managers): pick the customer's group from the drop-down, or pick `+ Add a group…`, type the new name and press Enter. The Sales app groups its customers by this. Use it when the chain number puts two different stores together.
+- `Upload Route Menu` (Administrators): pick the **Route Menu** workbook, and the **Route Book** too if you have it, then `Upload`. The Route Menu's **Customer By Route** tab decides every customer, route, day and load sequence; its **Address List** and **GPS Address** tabs fill in addresses. An address that was checked (looked up by the store's name and town, so it is where the truck goes) stays through the upload, and the upload never puts a PO box, mailbox, RR box or "c/o" address in place of a street address. The Route Book's run order, start times, keys and instructions replace what is here, and so does its truck drawing where the numbers still match. `Bring over the Sales app list` copies the list already uploaded for the Sales app instead.
+- **Group** (on `By Customer` and `Directory`, Administrators and Managers): pick the customer's group from the drop-down, or pick `+ Add a group…`, type the new name and press Enter. The Sales app groups its customers by this. Use it when the chain number puts two different stores together.
 - **DC** box: show one distribution center only. The full customer list brings in every distribution center.
-- `Import Addresses` (Administrators, in the same box): pick a sheet of checked ship-to addresses with **Account**, **Street**, **City**, **State** and **Zip** headings. Each one replaces that customer's address and stays through later Route Menu uploads. A PO box, mailbox, RR box or "c/o" address is left out, since it is not where the truck goes.
-- The company's **master customer file** (headings **DC**, **Chain**, **Account**, **Customer** or **Name**, the street, city, state and zip, and if there **Latitude**, **Longitude** and **Match status**) goes in with the same `Import Addresses` button. It replaces what is here: every customer gets its name, chain, distribution center, address, GPS and address check from the file, and a missing customer is added. Routes, groups, phones and notes stay. A customer from an earlier master file that is not in the new one, and is on no route, is removed. A street is never replaced by a PO box.
 - On `Directory`, **Address check** says how the address was checked; point at it for the notes and any proposed address. A customer's card shows the same.
+- The line at the bottom says when the Route Menu and the master list were last uploaded, from which file and by whom.
 - `Print` opens the print menu: this list as shown, the route sequence sheets for the office, the drivers' route book pages, the list by route or by day, or the customers' addresses and phones.
 
 > A new upload overrules everything changed here: whatever the workbooks have wins. Changes made in the app stay until the next upload, and nothing else puts them back. What the workbooks do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked).
@@ -48,6 +47,30 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 > **No address yet** in red means the Route Menu had no address for that account. Type it on the customer's card.
 
 !> Do not import an old Route Menu. A route day that is not in the workbook is taken off, and its customers move to not active (shown crossed out).
+
+## Master List
+id: customers-master
+screens: customers.html?view=master
+
+The tab on **Customers** where the company's **master list** goes in: every customer of every distribution center with its address, GPS, phone and group. The boxes at the top count the customers, how many have GPS, a phone or a group, and how many still have no address.
+
+1. Open `Customers`, then the `Master List` tab.
+2. Press the file box and pick the master list (.xlsx, .csv or .txt). It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and zip. **Latitude**, **Longitude**, **Phone**, **Contact**, **Group** and **Match status** are read when they are there.
+3. Press `Upload` and wait for the green line. A big list can take a minute.
+
+### Buttons
+
+- `Upload` (Administrators): reads the file. Each customer gets its name, chain, distribution center and address from it, and the GPS, phone, contact and group the file has. A customer the list does not have yet is added with no route.
+- The same box takes a sheet of **checked ship-to addresses** (Account, Street, City, State and Zip headings). The screen tells which one you picked. Each checked address replaces that customer's address and stays through later uploads.
+- Under the box: when the master list and the checked addresses sheet were last uploaded, and by whom.
+
+> Routes, run and load order, notes and keys always stay. A phone or group the file leaves blank stays as it is here.
+
+> A checked ship-to address stays, and a PO box, mailbox, RR box or "c/o" address never replaces a street, since it is not where the truck goes.
+
+> A customer from an earlier master list that the new one no longer has is removed, but only when it is on no route and the file is the whole list. A part of the list removes nothing.
+
+!> Do not upload an old master list. What the file has wins over what was typed here (except checked addresses).
 
 ## Route Book
 id: route-sequence
@@ -116,7 +139,7 @@ screens: administration.html
 For administrators only (it is not in the menu for anyone else).
 
 1. `Load Map Kiosk` opens the plant floor kiosk view, to see how it looks. Nothing can be changed from it.
-2. `Import the customer list` goes to **Customers**, where `Import Route Menu` uploads the workbooks.
+2. `Upload the customer list` goes to **Customers**, where `Upload Route Menu` uploads the workbooks and the `Master List` tab takes the master list.
 3. Under the tiles: when the last upload was, by whom and from which file.
 
 !> Do not upload an old Route Menu. A new upload overrules the changes made here.

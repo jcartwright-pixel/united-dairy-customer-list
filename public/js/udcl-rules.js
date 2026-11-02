@@ -405,12 +405,13 @@
       var at = function (names, dflt) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return dflt === undefined ? -1 : dflt; };
       var dc = at(['DC']), acct = at(['ACCOUNT']), name = at(['NAME', 'CUSTOMER']), chain = at(['CHAIN']);
       if (dc < 0 || acct < 0 || name < 0) continue;
-      // A sheet of looked-up ship-to addresses (it has a Confidence column) is not the master list: Import Addresses reads it.
+      // A sheet of looked-up ship-to addresses (it has a Confidence column) is not the master list: the Master List tab reads it as checked addresses.
       if (cells.indexOf('CONFIDENCE') >= 0) return [];
       var a1 = at(['ORIGINAL STREET', 'ADDRESS', 'STREET', 'ADDRESS 1', 'STREET 1'], name + 1), a2 = at(['ORIGINAL SECOND LINE', 'ADDRESS 2', 'STREET 2'], name + 2),
         city = at(['ORIGINAL CITY', 'CITY'], name + 3), st = at(['ORIGINAL STATE', 'STATE', 'ST'], name + 4), zip = at(['ORIGINAL ZIP', 'ZIP', 'ZIP CODE'], name + 5),
         lat = at(['LATITUDE', 'LAT']), lon = at(['LONGITUDE', 'LON', 'LNG']), check = at(['MATCH STATUS']), note = at(['REVIEW NOTES']), prop = at(['MATCHED ADDRESS']),
-        changed = at(['ADDRESS CHANGED?']), from = at(['COORDINATE SOURCE']);
+        changed = at(['ADDRESS CHANGED?']), from = at(['COORDINATE SOURCE']),
+        phone = at(['PHONE', 'PHONE NUMBER', 'TELEPHONE', 'PHONE #']), contact = at(['CONTACT', 'CONTACT NAME']), group = at(['GROUP']);
       var cell = function (row, i, max) { return i >= 0 ? text(row[i], max) : ''; };
       var num = function (row, i) { var v = i >= 0 ? Number(row[i]) : NaN; return isFinite(v) && v ? v : null; };
       var out = [];
@@ -421,6 +422,9 @@
         var x = { dc: d, chain: chain >= 0 ? numText(row[chain], LIMITS.chain) : '', account: account, name: nm, address: s1, address2: s2 && s2.toUpperCase() !== s1.toUpperCase() ? s2 : '',
           city: text(row[city], LIMITS.city), state: text(row[st], LIMITS.state).toUpperCase(), zip: numText(row[zip], LIMITS.zip) };
         if (lat >= 0) { x.lat = num(row, lat); x.lon = num(row, lon); }
+        if (phone >= 0 && cell(row, phone, LIMITS.phone)) x.phone = cell(row, phone, LIMITS.phone);
+        if (contact >= 0 && cell(row, contact, LIMITS.contact)) x.contact = cell(row, contact, LIMITS.contact);
+        if (group >= 0 && cell(row, group, LIMITS.group)) x.group = cell(row, group, LIMITS.group);
         if (check >= 0) { x.check = cell(row, check, 60); x.checkNote = cell(row, note, 300); x.gpsFrom = cell(row, from, 80); x.proposed = cell(row, changed, 40).toUpperCase() === 'YES' ? cell(row, prop, 200) : ''; }
         out.push(x);
       }
@@ -430,7 +434,7 @@
   }
 
   /**
-   * A sheet of checked ship-to addresses (Import Addresses): headings Account, Street (or Ship-to street, Address), City, State, Zip,
+   * A sheet of checked ship-to addresses (Master List tab): headings Account, Street (or Ship-to street, Address), City, State, Zip,
    * and if there, Street 2, Confidence and Source. One row per customer; rows with no account or street are skipped.
    */
   function checkedAddressRows(rows) {

@@ -13,7 +13,7 @@
     <script src="js/udcl-rules.js"></script>
 </head>
 <!-- Joe 11/1: the United Dairy Customer List (UDCL), the one customer list every app reads. See it by customer, by route or by
-     day, sort and filter it, change a customer, and print any of it from the Print menu. -->
+     day, a Directory and the Master List tab where the master list is uploaded, sort and filter it, change a customer, and print any of it from the Print menu. -->
 <body class="fill udcl-page" data-help="customers">
   <div class="signin" id="signin" hidden>
     <h1>Customer List</h1>
@@ -34,16 +34,17 @@
         <button type="button" role="tab" data-view="route" aria-selected="false">By Route</button>
         <button type="button" role="tab" data-view="day" aria-selected="false">By Day</button>
         <button type="button" role="tab" data-view="list" aria-selected="false">Directory</button>
+        <button type="button" role="tab" data-view="master" aria-selected="false">Master List</button>
       </div>
       <div class="actions in-head">
         <button type="button" id="add" hidden>+ Add Customer</button>
-        <button type="button" id="import" hidden>Import Route Menu</button>
+        <button type="button" id="import" hidden>Upload Route Menu</button>
         <span id="udcl-print-menu"></span>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="udcl-bar">
+      <div class="udcl-bar" id="bar">
         <div class="field"><label for="q">Find</label><input type="search" id="q" placeholder="Name, account, city, chain"></div>
         <div class="field"><label for="route">Route</label><select id="route"><option value="">All routes</option></select></div>
         <div class="field"><label for="day">Day</label><select id="day"><option value="">All days</option></select></div>
@@ -55,13 +56,14 @@
         </select></div>
         <span class="count" id="count"></span>
       </div>
-      <div class="scroll-list">
+      <div class="scroll-list" id="table-wrap">
         <table>
           <thead id="thead"></thead>
           <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
         </table>
       </div>
-      <div class="footer"><span id="imported"></span></div>
+      <div class="udcl-master" id="master" hidden></div>
+      <div class="footer udcl-foot" id="imported"></div>
     </div>
   </div>
 

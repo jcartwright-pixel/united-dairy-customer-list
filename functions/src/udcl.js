@@ -64,7 +64,8 @@ async function readPlant(db, plant) {
 async function view(db, plant, person) {
   const d = await readPlant(db, plant), r = rightsOf(person);
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
-    customers: d.customers, routeDays: d.routeDays, imported: d.meta ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
+    customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
+    master: d.meta && d.meta.master ? d.meta.master : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
     canEdit: r.edit, canImport: r.importList };
 }
 
@@ -277,7 +278,7 @@ async function importMenu(db, plant, email, input, stamp) {
     await batch.commit();
   }
   const meta = { plant, at: stamp, by: email, fileName: U.text(input.fileName, 120), counts, unrouted: loose.slice(0, 200) };
-  await db.collection('private').doc('udcl_' + plant).set(meta);
+  await db.collection('private').doc('udcl_' + plant).set(meta, { merge: true });
   await db.collection(LOG).add({ what: 'import', plant, record: 'udcl_' + plant, before: null, after: { fileName: meta.fileName, counts }, by: email, at: stamp });
   return { ok: true, counts, message: 'Imported ' + counts.customers + ' customers on ' + counts.routes + ' routes (' + counts.routeDays + ' route days) for ' + plantName(plant) + '.' };
 }
@@ -360,6 +361,7 @@ async function importAddresses(db, plant, email, input, stamp) {
   const rows = (Array.isArray(input.rows) ? input.rows : []).slice(0, U.MAX_LINES);
   if (!rows.length) fail('BAD_REQUEST', 'No addresses were found. The sheet needs Account, Street and City headings.');
   const c = await loadAddresses(db, plant, rows, email, stamp);
+  await db.collection('private').doc('udcl_' + plant).set({ addressSheet: { at: stamp, by: email, fileName: U.text(input.fileName, 200), counts: c } }, { merge: true });
   return { ok: true, counts: c, message: rows.length + ' addresses read: ' + c.changed + ' changed, ' + c.same + ' already right' + (c.missing ? ', ' + c.missing + ' not on the list' : '') + (c.refused ? ', ' + c.refused + ' left out (a PO box, mailbox or c/o is not a ship-to address)' : '') + '. They stay through the next Route Menu upload.' };
 }
 
@@ -411,6 +413,8 @@ async function importFullList(db, plant, email, input, stamp) {
     }
     const la = Number(r.lat), lo = Number(r.lon);
     if (isFinite(la) && isFinite(lo) && la && lo) { after.lat = la; after.lon = lo; gps++; }
+    // Joe 11/2: the master list can carry phones, contacts and groups too; a blank cell keeps what is here.
+    ['phone', 'contact', 'group'].forEach(k => { const v = U.text(r[k], U.LIMITS[k] || 60); if (v) after[k] = v; });
     if (r.check !== undefined) {
       after.addressCheck = U.text(r.check, 60); after.addressNote = U.text(r.checkNote, 300); after.addressProposed = U.text(r.proposed, 200); after.gpsFrom = U.text(r.gpsFrom, 80);
     }
@@ -438,8 +442,10 @@ async function importFullList(db, plant, email, input, stamp) {
   }
   const other = clean.filter(x => x.dc !== dc).length, skipped = all.length - clean.length;
   const counts = { read: clean.length, added, changed, same, removed, gps, otherDc: other, skipped };
+  // The Master List tab shows the last upload (Joe 11/2).
+  await db.collection('private').doc('udcl_' + plant).set({ master: { at: stamp, by: email, fileName: U.text(input.fileName, 200), counts } }, { merge: true });
   return { ok: true, counts, message: clean.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added, ' + changed + ' updated, ' + same + ' already right' +
-    (removed ? ', ' + removed + ' from an earlier list removed' : '') + '. ' + gps + ' have GPS. Routes, groups, phones and notes were kept.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
+    (removed ? ', ' + removed + ' from an earlier list removed' : '') + '. ' + gps + ' have GPS. Routes and notes were kept, and a phone or group the file leaves blank stays as it is here.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
 }
 
 const OPS = { saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };

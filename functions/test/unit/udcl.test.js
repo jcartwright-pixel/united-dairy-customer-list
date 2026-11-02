@@ -11,7 +11,7 @@ function fakeDb(seed) {
   const docs = new Map(Object.entries(seed || {}));
   let n = 0;
   const snap = (path) => ({ exists: docs.has(path), id: path.split('/').pop(), data: () => (docs.has(path) ? JSON.parse(JSON.stringify(docs.get(path))) : undefined) });
-  const ref = (col, id) => ({ id, path: col + '/' + id, get: async () => snap(col + '/' + id), set: async (v) => { docs.set(col + '/' + id, JSON.parse(JSON.stringify(v))); }, delete: async () => { docs.delete(col + '/' + id); } });
+  const ref = (col, id) => ({ id, path: col + '/' + id, get: async () => snap(col + '/' + id), set: async (v, o) => { const was = (o && o.merge && docs.get(col + '/' + id)) || {}; docs.set(col + '/' + id, JSON.parse(JSON.stringify(Object.assign({}, was, v)))); }, delete: async () => { docs.delete(col + '/' + id); } });
   const collection = (col) => ({
     doc: (id) => ref(col, id === undefined ? 'auto' + (++n) : id),
     add: async (v) => { const r = ref(col, 'auto' + (++n)); await r.set(v); return r; },
@@ -412,4 +412,13 @@ test('Joe 11/2: Import Addresses with a DC column finds the customer by DC and a
   // A master upload afterwards keeps the looked-up address.
   await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: U.fullListRows([['DC', 'CHAIN', 'ACCOUNT', 'NAME'], [1, 0, 5001, 'OTHER DC STORE', '9 FAR RD', '', 'FARTOWN', 'OH', 43950]]) }, now);
   assert.equal((await S.udclCall(db, boss, PLANT, { op: 'view' })).customers['D1-5001'].address, '12 RIVER RD');
+});
+
+test('Joe 11/2: the master list reads Phone, Contact and Group when the file has them; a blank cell is left out', () => {
+  const U = require('../../src/udcl-rules');
+  const rows = U.fullListRows([['DC', 'Chain', 'Account', 'Customer', 'Street', 'City', 'State', 'Zip', 'Phone', 'Group'],
+    [30, 0, 1196, 'ACORN CORNER MARKET', '12 ELM ST', 'MAPLETON', 'PA', 15401, '555-0199', 'Corner Stores'],
+    [30, 0, 1984, 'QUICK STOP', '4 OAK RD', 'MAPLETON', 'PA', 15401, null, '']]);
+  assert.equal(rows[0].phone, '555-0199'); assert.equal(rows[0].group, 'Corner Stores');
+  assert.equal(rows[1].phone, undefined); assert.equal(rows[1].group, undefined);
 });

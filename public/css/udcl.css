@@ -154,3 +154,29 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 .udcl-modal .ed-day.off { opacity: .4; }
 /* Joe 11/2: the Directory's Group drop-down. */
 .udcl-page select.grp, .udcl-page input.grp-new { width: 100%; min-height: 32px; font: inherit; padding: 2px 6px; border: 1px solid #c4d0dc; border-radius: 6px; background: #fff; }
+
+/* Joe 11/2 facelift: the Master List tab, the footer, and calmer action buttons. */
+.udcl-page th.dayroute, .udcl-page td.dayroute { min-width: 3.2em; padding-left: 2px; padding-right: 2px; }
+.udcl-page .head .actions.in-head { gap: 8px; }
+.udcl-page .head .actions.in-head > button { min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.udcl-page .head .actions.in-head > button#add { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.udcl-page .head .actions.in-head > button:hover { filter: brightness(.96); }
+.udcl-foot { flex-wrap: wrap; gap: 4px 24px; font-size: 14px; }
+.udcl-foot b { color: var(--ink); }
+.udcl-master { flex: 1; min-height: 0; overflow: auto; padding: 4px 16px 16px; display: grid; gap: 14px; align-content: start; max-width: 1100px; }
+.ml-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ml-stat { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.ml-stat b { font-size: 26px; color: var(--ud-blue-dark); font-variant-numeric: tabular-nums; }
+.ml-stat span { color: var(--muted); font-size: 14px; }
+.ml-stat.warn b { color: #9a4b00; }
+.ml-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; line-height: 1.45; }
+.ml-card h2 { margin: 0 0 8px; font-size: 20px; color: var(--ud-blue-dark); }
+.ml-card ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.ml-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; padding: 12px; border: 2px dashed #c4d0dc; border-radius: 10px; background: var(--band, #eef3f8); }
+.ml-pick input[type="file"] { font: inherit; flex: 1; min-width: 240px; }
+.ml-pick button { min-height: 40px; padding: 0 22px; border-radius: 8px; border: 0; background: var(--ud-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.ml-pick button:disabled { opacity: .6; cursor: wait; }
+.ml-card .msg { padding: 8px 10px; border-radius: 8px; background: var(--band); }
+.ml-card .msg.bad { background: var(--error-bg); color: var(--error-ink); }
+.ml-card .msg.good { background: var(--runs-bg); color: var(--runs-ink); }
+.ml-last { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
