@@ -366,6 +366,8 @@
   function dcOf(v) { var t = numText(v, 4).replace(/^0+(?=\d)/, ''); return DCS.some(function (d) { return d.code === t; }) ? t : ''; }
   /** "30 Uniontown" for a DC code, '' when it has none. */
   function dcName(v) { var t = dcOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : ''; }
+  // The parts of a ship-to address (a checked one stays through an upload: importMenu).
+  var ADDRESS_FIELDS = ['address', 'address2', 'city', 'state', 'zip', 'lat', 'lon'];
   var CUSTOMER_FIELDS = ['name', 'chain', 'dc', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
   function cleanCustomer(c) {
     var out = {};
@@ -377,6 +379,14 @@
     if (c && c.lon !== undefined) { var lo = Number(c.lon); out.lon = isFinite(lo) && lo ? lo : null; }
     if (c && c.active !== undefined) out.active = c.active !== false;
     return out;
+  }
+
+  /**
+   * Joe 11/2: "Anything that says PO box or mailbox is not a true address." A post office box, mailbox, rural route or R.D. box, or
+   * an address in care of someone else (the schools' "Nutrition Inc. c/o") is where mail goes, not where the truck goes.
+   */
+  function notStreet(a) {
+    return /(\bP\.?\s*O\.?\s*(BOX|BX|DRAWER)\b|\bPOST\s+OFFICE\b|\bMAIL\s*BOX\b|\bPMB\b|\bC\s*\/\s*O\b|\bCARE\s+OF\b|\bR\.?\s*R\.?\s*#?\s*\d+[,\s]+BOX\b|\bR\.?\s*D\.?\s*#?\s*\d*[,\s]+BOX\b|^\s*BOX\s+\d)/i.test(String(a || ''));
   }
 
   /** One line of the customer's address, for lists and print. */
@@ -391,5 +401,5 @@
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
-    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine };
+    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, ADDRESS_FIELDS: ADDRESS_FIELDS };
 });
