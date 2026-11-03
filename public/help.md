@@ -75,6 +75,8 @@ On **Administration** (administrators only): the master customer list, every cus
 
 > **DC** and **Route**: the master file's DC column also holds route numbers for Marietta's customers (103, 107, 112 and the like, and 0, 8, 12 and 14). A number that is not a branch shows under **Route**, and the customer's **DC** is 9 Marietta. Only 1, 6, 7, 9, 30 and 50 (and 51, 61, 71 and 80) are branches.
 
+> Uniontown, 11/3: every Uniontown customer on no route was made inactive once, and a customer on a Uniontown route that the master list had under another DC (or route 815) became a Uniontown customer. It ran once; switch any customer back here as usual. A master upload now files a customer on a Uniontown route under Uniontown.
+
 > Making a customer active again does not put it back on a route. Add it on **Route Book**, or the next Route Menu upload puts it back where the Route Menu has it.
 
 > A Route Menu upload makes a customer it lists active again.

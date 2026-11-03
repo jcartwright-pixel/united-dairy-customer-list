@@ -374,10 +374,11 @@
   // the DC": every one of those customers is chain 0 with an account from one 4 to 5 digit series, the Marietta books (DC 9 has no
   // other customers in the file), so their branch is Marietta. The number stays as the file has it (an upload matches on it) and
   // shows under Route.
-  var NOT_BRANCH = { '0': 1, '8': 1, '11': 1, '12': 1, '14': 1 }, ROUTE_BRANCH = '9';
+  // Route 815 is Uniontown's (Beaver County, PA; it is on the Uniontown Route Menu), not Marietta's.
+  var NOT_BRANCH = { '0': 1, '8': 1, '11': 1, '12': 1, '14': 1 }, ROUTE_BRANCH = '9', ROUTE_OWNER = { '815': '30' };
   function isBranchCode(t) { return !!t && !NOT_BRANCH[t] && Number(t) <= 80; }
   /** The customer's branch (DC) code: the code itself, or Marietta for a route number; '' when blank. */
-  function branchOf(v) { var t = dcOf(v); return !t || isBranchCode(t) ? t : ROUTE_BRANCH; }
+  function branchOf(v) { var t = dcOf(v); return !t || isBranchCode(t) ? t : ROUTE_OWNER[t] || ROUTE_BRANCH; }
   // Joe 11/3: "any customer that has 3 periods in front of the name is an inactive customer." An upload makes it inactive.
   function inactiveName(name) { return /^\s*\.{3}/.test(String(name || '')); }
   /** The route number the master file put in its DC column, '' when that column holds a branch or is blank. */
