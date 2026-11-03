@@ -7,7 +7,7 @@
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>Master Customer List · Customer List</title>
+  <title>Customers · Customer List</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/udcl.css">
   <script src="js/udcl-rules.js"></script>
@@ -16,10 +16,11 @@
      every heading. Administrators only.
      Joe 11/3: "get rid of the garbage ... I have more usable room for the list." One slim bar on top (title, the boxes, Upload,
      Print), the list fills the rest, the totals sit in one line at the bottom, and the upload opens in its own box.
-     Joe 11/3: double-click a status to switch it; pick rows (click, Shift-click, drag) and Make inactive / Make active. -->
+     Joe 11/3: double-click a status to switch it; pick rows (click, Shift-click, drag) and Make inactive / Make active.
+     Joe 11/3: its own tab, Customers (out of Administration); the group is set here, in the Group column before Chain. -->
 <body class="fill udcl-page ml-page" data-help="master-customers">
   <div class="signin" id="signin" hidden>
-    <h1>Master Customer List</h1>
+    <h1>Customers</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -31,12 +32,12 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <p class="udcl-help" id="not-admin" hidden>Only an administrator can use the Master Customer List.</p>
+    <p class="udcl-help" id="not-admin" hidden>Only an administrator can use Customers.</p>
 
     <div class="view" id="master-view" hidden>
       <div class="ml-bar">
-        <h1 class="ml-title"><a href="administration.html">Administration</a><span aria-hidden="true"> › </span>Master Customer List</h1>
-        <input type="search" id="q" placeholder="Find: name, account, city, ZIP, phone" aria-label="Find">
+        <h1 class="ml-title">Customers</h1>
+        <input type="search" id="q" placeholder="Find: name, account, city, ZIP, phone, group" aria-label="Find">
         <select id="sort" aria-label="Sort by">
           <option value="location">Sort: Location, then A to Z</option><option value="name">Sort: Customer name, A to Z</option><option value="city">Sort: City, then A to Z</option><option value="status">Sort: Inactive first</option><option value="">Sort: The heading you pressed</option>
         </select>
@@ -52,7 +53,7 @@
           <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
         </table>
       </div>
-      <div class="ml-picked" id="picked" hidden role="toolbar" aria-label="Picked customers"><b id="picked-n"></b><button type="button" id="pick-off">Make inactive</button><button type="button" id="pick-on">Make active</button><button type="button" id="pick-clear" class="quiet">Clear</button></div>
+      <div class="ml-picked" id="picked" hidden role="toolbar" aria-label="Picked customers"><b id="picked-n"></b><button type="button" id="pick-off">Make inactive</button><button type="button" id="pick-on">Make active</button><select id="pick-group" aria-label="Set the group of the picked customers"></select><button type="button" id="pick-clear" class="quiet">Clear</button></div>
       <div class="ml-foot"><span id="card-stats"></span><span id="card-last"></span><span id="save-msg"></span></div>
     </div>
   </div>

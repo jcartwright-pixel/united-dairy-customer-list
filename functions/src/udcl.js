@@ -66,12 +66,19 @@ async function view(db, plant, person, opts) {
   // Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system." Only the Master Customer List (an
   // administrator, asking with all) gets the inactive ones.
   const all = !!(opts && opts.all && r.importList);
+  const groups = groupsOf(d);
   let inactive = 0;
   if (!all) Object.keys(d.customers).forEach(k => { if (d.customers[k].inactive) { delete d.customers[k]; inactive++; } });
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
     customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
     master: d.meta && d.meta.master ? d.meta.master : null, routeRule: d.meta && d.meta.routeRule ? d.meta.routeRule : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
-    inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList };
+    groups, inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList };
+}
+// Joe 11/3: the groups are added in Administration (kept on the plant's meta), and any group a customer already has counts too.
+function groupsOf(d) {
+  const set = new Set(((d.meta && d.meta.groups) || []).filter(Boolean));
+  Object.values(d.customers).forEach(c => { if (c.group) set.add(c.group); });
+  return [...set].sort(U.byName);
 }
 
 function logEntry(db, batchOrTx, what, plant, ref, before, after, email, stamp) {
@@ -562,8 +569,83 @@ async function applyRouteRule(db, plant, email, input, stamp) {
     (merged.length ? '; ' + merged.length + ' on a ' + plantName(plant) + ' route that the master list had under another DC are ' + plantName(plant) + ' customers now' : '') + '.' };
 }
 
-const OPS = { setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+
+/**
+ * Joe 11/3: a group is set on the Customers tab (the master list), on one customer or on many picked at once (a whole chain).
+ * input: { keys, group } ('' takes the group off). Sends back only those customers.
+ */
+async function setGroup(db, plant, email, input, stamp) {
+  const keys = [...new Set((Array.isArray(input.keys) ? input.keys : []).map(k => U.text(k, 60)).filter(Boolean))].slice(0, 10000);
+  if (!keys.length) fail('BAD_REQUEST', 'Pick a customer.');
+  const group = U.text(input.group, U.LIMITS.group);
+  const refs = keys.map(k => db.collection(CUSTOMERS).doc(U.customerId(plant, k)));
+  const snaps = [];
+  for (let i = 0; i < refs.length; i += 300) snaps.push(...await db.getAll(...refs.slice(i, i + 300)));
+  const customers = {}, writes = [];
+  snaps.forEach((snap, i) => {
+    if (!snap.exists) return;
+    const before = snap.data();
+    if ((before.group || '') === group) { customers[before.key] = before; return; }
+    const after = Object.assign({}, before, { group, updatedAt: stamp, updatedBy: email });
+    customers[after.key] = after;
+    writes.push([refs[i], before, after]);
+  });
+  if (!Object.keys(customers).length) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([ref, before, after]) => { batch.set(ref, after); logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp); });
+    await batch.commit();
+  }
+  const n = keys.length, one = n === 1 ? customers[keys[0]] : null;
+  const message = one ? one.name + (group ? ' is in ' + group : ' has no group') + ' now.' : n + ' customers ' + (group ? 'are in ' + group : 'have no group') + ' now.';
+  return { ok: true, customers, changed: writes.length, message };
+}
+
+/**
+ * Joe 11/3: "in administration is where I'd like to add groups." input: { add: name } | { rename: { from, to } } | { remove: name }.
+ * Renaming or removing a group changes every customer that has it. Sends back the plant's groups with how many customers each has.
+ */
+async function saveGroups(db, plant, email, input, stamp) {
+  const metaRef = db.collection('private').doc('udcl_' + plant);
+  const d = await readPlant(db, plant), list = groupsOf(d);
+  const same = (a, b) => a.toUpperCase() === b.toUpperCase();
+  const add = U.text(input.add, U.LIMITS.group), remove = U.text(input.remove, U.LIMITS.group);
+  const from = U.text(input.rename && input.rename.from, U.LIMITS.group), to = U.text(input.rename && input.rename.to, U.LIMITS.group);
+  let groups = list.slice(), change = null, message;
+  if (add) {
+    const had = list.find(g => same(g, add));
+    if (had) fail('BAD_REQUEST', had + ' is already a group.');
+    groups.push(add); message = add + ' was added.';
+  } else if (from && to) {
+    if (!list.includes(from)) fail('NOT_FOUND', from + ' is not a group any more. Reload the page.');
+    const had = list.find(g => same(g, to) && g !== from);
+    if (had) fail('BAD_REQUEST', had + ' is already a group.');
+    groups = groups.map(g => (g === from ? to : g)); change = [from, to];
+  } else if (remove) {
+    if (!list.includes(remove)) fail('NOT_FOUND', remove + ' is not a group any more. Reload the page.');
+    groups = groups.filter(g => g !== remove); change = [remove, ''];
+  } else fail('BAD_REQUEST', 'Type the group\'s name.');
+  const writes = [];
+  if (change) Object.values(d.customers).forEach(c => {
+    if (c.group !== change[0]) return;
+    writes.push([db.collection(CUSTOMERS).doc(U.customerId(plant, c.key)), c, Object.assign({}, c, { group: change[1], updatedAt: stamp, updatedBy: email })]);
+  });
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([ref, before, after]) => { batch.set(ref, after); logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp); });
+    await batch.commit();
+  }
+  groups = [...new Set(groups)].sort(U.byName);
+  await metaRef.set({ groups }, { merge: true });
+  const moved = writes.length ? ' ' + writes.length + ' customer' + (writes.length === 1 ? '' : 's') + (change[1] ? ' moved to ' + change[1] : ' have no group now') + '.' : '';
+  if (change) message = (change[1] ? change[0] + ' is now ' + change[1] + '.' : change[0] + ' was removed.') + moved;
+  const counts = {};
+  Object.values(d.customers).forEach(c => { const g = change && c.group === change[0] ? change[1] : c.group; if (g) counts[g] = (counts[g] || 0) + 1; });
+  return { ok: true, groups: groups.map(name => ({ name, customers: counts[name] || 0 })), message };
+}
+
+const OPS = { setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {

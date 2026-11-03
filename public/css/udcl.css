@@ -152,8 +152,13 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 .udcl-modal .ed-part { border: 1px solid #d5dee8; border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
 .udcl-modal .ed-part h3 { margin: 0; font-size: 16px; color: var(--ud-blue); }
 .udcl-modal .ed-day.off { opacity: .4; }
-/* Joe 11/2: the Directory's Group drop-down. */
-.udcl-page select.grp, .udcl-page input.grp-new { width: 100%; min-height: 32px; font: inherit; padding: 2px 6px; border: 1px solid #c4d0dc; border-radius: 6px; background: #fff; }
+/* Joe 11/3: the Group column on Customers: click it to change the group. */
+.master-table button.grp { all: unset; display: block; width: 100%; box-sizing: border-box; padding: 2px 6px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.master-table button.grp:hover, .master-table button.grp:focus-visible { background: #e8f0f8; outline: 1px solid #c4d0dc; }
+.master-table button.grp.none { color: transparent; font-style: italic; }
+.master-table tr:hover button.grp.none, .master-table button.grp.none:focus-visible { color: var(--muted); }
+.master-table select.grp-pick, .ml-picked select { width: 100%; min-height: 30px; font: inherit; font-size: 14px; padding: 2px 4px; border: 1px solid #c4d0dc; border-radius: 6px; background: #fff; }
+.ml-picked select { width: auto; min-height: 36px; }
 
 /* Joe 11/2 facelift: the footer and calmer action buttons. */
 .udcl-page th.dayroute, .udcl-page td.dayroute { min-width: 3.2em; padding-left: 2px; padding-right: 2px; }
@@ -236,3 +241,19 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .ml-picked button#pick-on { background: #fff; color: var(--ud-blue); }
 .ml-picked button.quiet { background: none; border-color: transparent; color: var(--muted); }
 .ml-page .ml-table.has-picked { padding-bottom: 72px; }
+
+/* Administration, Groups (Joe 11/3). */
+.adm-groups { max-width: 760px; margin: 0 16px 20px; padding: 18px 20px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.adm-groups h2 { margin: 0 0 4px; font-size: 22px; color: var(--ud-blue-dark); }
+.adm-groups .udcl-help { margin: 0 0 12px; padding: 0; }
+.adm-add { display: flex; gap: 8px; margin-bottom: 8px; }
+.adm-add input { flex: 1 1 auto; min-height: 38px; font: inherit; padding: 0 10px; border: 1px solid #c4d0dc; border-radius: 7px; }
+.adm-msg { min-height: 1.4em; margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.adm-msg.good { color: #1b6b2f; } .adm-msg.bad { color: #b3261e; }
+.adm-table { width: 100%; border-collapse: collapse; }
+.adm-table th, .adm-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+.adm-table th.l, .adm-table td.l { text-align: left; } .adm-table td.r { text-align: right; white-space: nowrap; }
+.adm-table th { font-size: 13px; text-transform: uppercase; }
+.adm-table input.g-name { width: 100%; min-height: 32px; font: inherit; padding: 0 8px; border: 1px solid var(--ud-blue); border-radius: 6px; }
+.adm-table button { min-height: 32px; padding: 0 12px; font: inherit; font-size: 14px; border: 1px solid var(--ud-blue); border-radius: 7px; background: #fff; color: var(--ud-blue); font-weight: 700; cursor: pointer; }
+.adm-table button.primary { background: var(--ud-blue); color: #fff; }

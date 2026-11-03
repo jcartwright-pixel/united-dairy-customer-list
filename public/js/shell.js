@@ -16,7 +16,8 @@ const QS = new URLSearchParams(location.search);
 // (administrators only), and the kiosk itself has just an Administration button.
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'The Customer List screens' },
-  { href: 'customers.html', name: 'Customers', note: 'Every customer by customer, route or day; sort, filter, print' },
+  { href: 'master-customers.html', name: 'Customers', note: 'Administrators only: every customer, Active or Inactive, with addresses, GPS, phones and groups', admin: true },
+  { href: 'customers.html', name: 'Routes', note: 'Every customer by customer, route or day; sort, filter, print' },
   { href: 'route-sequence.html', name: 'Route Book', note: 'Change a route day\'s run order and print it for the office' },
   { href: 'load-map.html', name: 'Truck Load Map', note: 'How the truck is loaded, the customers beside it' },
   { href: 'administration.html', name: 'Administration', note: 'Administrators only: the Load Map Kiosk view and the last import', admin: true },
@@ -109,8 +110,7 @@ export async function installApp() {
 export const canInstall = () => !!installPrompt;
 
 /* ---------- the header and the menu ---------- */
-// The Master Customer List is part of Administration (Joe 11/2).
-const hereHref = () => HERE === 'master-customers.html' ? 'administration.html' : HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
+const hereHref = () => HERE + (QS.get('kiosk') === '1' ? '?kiosk=1' : '');
 function drawFrame() {
   // Joe 11/2: nothing pops in late. Administration shows at once for whoever was an administrator last time (the server checks
   // again), and the screen under the menu stays hidden, with one "Reading" line, until its list is in and drawn: then it all

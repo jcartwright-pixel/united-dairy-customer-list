@@ -37,7 +37,7 @@ function draw() {
       '<td>' + e(c.chain || '') + '</td><td>' + e(c.account || s.account) + '</td><td class="l"><b>' + e(c.name || s.name) + '</b></td>' +
       '<td class="l">' + (edit ? '<input class="note" data-i="' + i + '" value="' + e(s.note || '') + '" placeholder="Note for this stop">' : e(s.note || '')) + '</td>' +
       '<td>' + (edit ? '<button type="button" class="mv" data-up="' + i + '" title="Move up"' + (i ? '' : ' disabled') + '>&#9650;</button> <button type="button" class="mv" data-down="' + i + '" title="Move down"' + (i < stops.length - 1 ? '' : ' disabled') + '>&#9660;</button> <button type="button" class="ed" data-ed="' + i + '">Edit</button>' : '') + '</td></tr>';
-  }).join('') || '<tr><td colspan="7" class="empty">' + (data.routeDays.length ? 'No stops on this route day.' : 'The customer list is empty. An administrator imports it on the Customers screen.') + '</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="empty">' + (data.routeDays.length ? 'No stops on this route day.' : 'The customer list is empty. An administrator imports it on the Routes screen.') + '</td></tr>';
   $('start').value = rd ? rd.startTime || '' : ''; $('notes').value = rd ? rd.notes || '' : '';
   $('start').disabled = $('notes').disabled = !edit || !rd;
   $('map').innerHTML = rd ? truckHtml(rd.map, { style: '--lm-w:30px;--lm-h:20px;--lm-f:12px' }) : '';

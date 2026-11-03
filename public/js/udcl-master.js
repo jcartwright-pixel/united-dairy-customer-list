@@ -1,10 +1,12 @@
-// The Master Customer List (Joe 11/2, in Administration): "basically a master customer list. It will show all of them", every
+// Customers, the master customer list (Joe 11/2; its own tab since 11/3, it was in Administration): "basically a master customer list. It will show all of them", every
 // distribution center, with Active or Inactive first ("If it is inactive, then it's not showing anywhere else in our system"),
 // a Sort by box (location, then A to Z) and a sort on every heading. The master address file is uploaded here.
 // Joe 11/3: the list gets the room. One slim bar on top, the totals in one line at the bottom, the upload in its own box.
 // Joe 11/3: "clicking inactive ... is extremely slow", "I'd like to be able to double click ... to go between active and inactive",
 // and a lot of them at once. Double-click a status to switch it. Click rows (Shift-click for a run, or drag down the list) to pick
 // many, then Make inactive / Make active. A change saves only those customers and redraws only their lines.
+// Joe 11/3: "There is where I want to be able to edit the group", in the Group column, before Chain. Click a group to change it,
+// or pick lines and set one group for all of them. The groups themselves are added on Administration.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
 import { readList, saveStep, printMenu, printDoc, tablePage, U } from './udcl.js';
 
@@ -19,13 +21,13 @@ const fixed = (v) => v ? Number(v).toFixed(6) : '';
 const dcLabel = (v) => { const d = U.branchOf(v); return d ? U.dcName(d).replace(/ DC \d+$/, '') : ''; };
 const statusOf = (c) => c.inactive ? 'Inactive' : 'Active';
 // [heading, value, centred, width, cut long text]
-const COLS = [['Status', statusOf, 1, '6%'], ['DC', c => dcLabel(c.dc), 0, '7%'], ['Route', c => U.dcRoute(c.dc), 1, '4.5%'], ['Chain', c => c.chain, 1, '3.5%'], ['Account', c => c.account, 1, '5%'], ['Customer', c => c.name, 0, '11%', 1],
-  ['Street', c => c.address, 0, '10%', 1], ['Second line', c => c.address2, 0, '5%', 1], ['City', c => c.city, 0, '7%', 1], ['State', c => c.state, 1, '3%'], ['ZIP', c => c.zip, 1, '5.5%'],
-  ['Latitude', c => c.lat && c.lon ? fixed(c.lat) : '', 1, '5.5%'], ['Longitude', c => c.lat && c.lon ? fixed(c.lon) : '', 1, '5.5%'], ['Phone', c => c.phone, 0, '6%', 1], ['Group', c => c.group || '', 0, '5.5%', 1],
-  ['Match status', c => c.addressCheck || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '6%', 1]];
+const COLS = [['Status', statusOf, 1, '6%'], ['DC', c => dcLabel(c.dc), 0, '7%'], ['Route', c => U.dcRoute(c.dc), 1, '4%'], ['Group', c => c.group || '', 0, '6%', 1], ['Chain', c => c.chain, 1, '3.5%'], ['Account', c => c.account, 1, '5%'], ['Customer', c => c.name, 0, '11%', 1],
+  ['Street', c => c.address, 0, '9%', 1], ['Second line', c => c.address2, 0, '4%', 1], ['City', c => c.city, 0, '7%', 1], ['State', c => c.state, 1, '3%'], ['ZIP', c => c.zip, 1, '4.5%'],
+  ['Latitude', c => c.lat && c.lon ? fixed(c.lat) : '', 1, '5%'], ['Longitude', c => c.lat && c.lon ? fixed(c.lon) : '', 1, '5%'], ['Phone', c => c.phone, 0, '6%', 1],
+  ['Match status', c => c.addressCheck || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '5.5%', 1]];
 const coll = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 // The Sort by box: each is a list of [column, direction]. A heading pressed sorts by it (again: the other way).
-const NAME = 5, CITY = 8;
+const GROUP = 3, NAME = 6, CITY = 9;
 const PRESETS = { location: [[1, 1], [NAME, 1]], name: [[NAME, 1]], city: [[CITY, 1], [NAME, 1]], status: [[0, -1], [1, 1], [NAME, 1]] };
 const DC_NUM = (c) => Number(U.branchOf(c.dc)) || 99999;
 const PAGE = 300;
@@ -56,11 +58,13 @@ function shownRows() {
   return keyed.map(x => x.c);
 }
 
+const groupCell = (c) => data.canEdit ? '<button type="button" class="grp' + (c.group ? '' : ' none') + '" data-key="' + e(c.key) + '" title="Click to change the group">' + e(c.group || 'No group') + '</button>' : e(c.group || '');
 const statusCell = (c) => '<button type="button" class="st ' + (c.inactive ? 'off' : 'on') + '" data-key="' + e(c.key) + '" title="Double-click to switch">' + statusOf(c) + '</button>';
 function rowHtml(c) {
   return '<tr class="' + (c.inactive ? 'is-inactive' : '') + (picked.has(c.key) ? ' picked' : '') + '" data-key="' + e(c.key) + '"><td class="pick"><span class="box" aria-hidden="true"></span></td>' + COLS.map((col, i) => {
     const v = col[1](c);
     if (i === 0) return '<td>' + statusCell(c) + '</td>';
+    if (i === GROUP) return '<td class="l grp-cell">' + groupCell(c) + '</td>';
     if (col[0] === 'Latitude' && v !== '') return '<td><a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(v) + '</a></td>';
     return '<td' + (col[2] ? '' : ' class="l"') + (col[4] ? ' title="' + e(v) + '"' : '') + '>' + (col[0] === 'Customer' ? '<b>' + e(v) + '</b>' : col[0] === 'Street' && !v ? '<span class="warnline">No address yet</span>' : e(v)) + '</td>';
   }).join('') + '</tr>';
@@ -107,8 +111,50 @@ function drawPicked() {
   $('picked').hidden = !picked.size;
   $('table-wrap').classList.toggle('has-picked', picked.size > 0);   // room under the last line for the floating bar
   $('picked-n').textContent = picked.size.toLocaleString() + ' picked';
+  $('pick-group').hidden = !data.canEdit;
+  $('pick-group').innerHTML = '<option value="">Set group…</option>' + groupOptions() + '<option value="-">No group</option>';
   const inView = rowsNow.filter(c => picked.has(c.key)).length, all = $('pick-all');
   if (all) { all.classList.toggle('all', !!rowsNow.length && inView === rowsNow.length); all.classList.toggle('some', inView > 0 && inView < rowsNow.length); }
+}
+
+/* ---------- groups: click one to change it, or set one group on every picked line ---------- */
+const groupsNow = () => data.groups || [];
+const groupOptions = (now) => groupsNow().map(g => '<option' + (g === now ? ' selected' : '') + '>' + e(g) + '</option>').join('');
+function showGroup(c) { const tr = rowOf(c.key); if (tr) tr.cells[1 + GROUP].innerHTML = groupCell(c); }
+$('rows').addEventListener('click', ev => {
+  const b = ev.target.closest('button.grp'); if (!b) return;
+  const c = data.customers[b.dataset.key]; if (!c) return;
+  if (!groupsNow().length) { $('save-msg').textContent = 'There are no groups yet. Add them on Administration, Groups.'; return; }
+  const sel = document.createElement('select');
+  sel.className = 'grp-pick'; sel.setAttribute('aria-label', 'Group for ' + c.name);
+  sel.innerHTML = '<option value="">No group</option>' + groupOptions(c.group || '');
+  b.replaceWith(sel); sel.focus();
+  let done = false;
+  const finish = (save) => { if (done) return; done = true; if (save && sel.value !== (c.group || '')) setGroup([c.key], sel.value); else showGroup(c); };
+  sel.addEventListener('change', () => finish(true));
+  sel.addEventListener('blur', () => finish(false));
+  sel.addEventListener('keydown', k => { if (k.key === 'Escape') { k.stopPropagation(); finish(false); } });
+});
+$('pick-group').addEventListener('change', () => {
+  const v = $('pick-group').value; if (!v) return;
+  setGroup([...picked], v === '-' ? '' : v);
+});
+async function setGroup(keys, group) {
+  const list = keys.map(k => data.customers[k]).filter(Boolean), was = list.map(c => [c, c.group || '']);
+  list.forEach(c => { c.group = group; showGroup(c); const tr = rowOf(c.key); if (tr) tr.classList.add('saving'); });
+  $('save-msg').textContent = 'Saving ' + (list.length === 1 ? list[0].name : list.length.toLocaleString() + ' customers') + '…';
+  try {
+    const out = await saveStep('setGroup', { keys: list.map(c => c.key), group });
+    Object.assign(data.customers, out.customers || {});
+    if (keys.length > 1) { keys.forEach(k => setPicked(k, false)); }
+    showError(''); $('save-msg').textContent = out.message;
+  } catch (err) {
+    was.forEach(([c, before]) => { c.group = before; });
+    showError(serverText(err, 'the customer list')); $('save-msg').textContent = '';
+  }
+  list.forEach(c => { const now = data.customers[c.key] || c; showGroup(now); const tr = rowOf(c.key); if (tr) tr.classList.remove('saving'); });
+  drawPicked();
+  if (order.some(([i]) => i === GROUP)) draw();
 }
 
 function setData(d) {
@@ -128,7 +174,7 @@ function pickRun(from, to, on) {
 let drag = null;
 $('rows').addEventListener('mousedown', ev => {
   const tr = ev.target.closest('tr[data-key]');
-  if (!tr || ev.button !== 0 || ev.target.closest('a, button')) return;
+  if (!tr || ev.button !== 0 || ev.target.closest('a, button, select')) return;
   ev.preventDefault();                                                   // no text gets highlighted while dragging
   const key = tr.dataset.key, on = !picked.has(key);
   if (ev.shiftKey && anchor) pickRun(anchor, key, true); else setPicked(key, on);

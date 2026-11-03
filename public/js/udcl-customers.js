@@ -1,4 +1,4 @@
-// Customers (United Dairy Customer List, Joe 11/1): every customer by customer, by route or by day, with the boxes to find,
+// Routes (United Dairy Customer List, Joe 11/1; named Routes on 11/3, the master list is Customers now): every customer by customer, by route or by day, with the boxes to find,
 // filter and sort, a customer's own card (address, phone, keys or door code, notes) and the Print menu. An Administrator imports the
 // Route Menu workbook here (and the Route Book with it), or brings over the Sales app's list.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
@@ -8,7 +8,7 @@ const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.m
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
 
 const params = new URLSearchParams(location.search);
-// Joe 11/2: the Customer Address List moved to Administration as the Master Customer List.
+// Joe 11/2: the Customer Address List became the master list (the Customers tab since 11/3).
 if (params.get('view') === 'master') location.replace('master-customers.html');
 let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
 // Worked out once each time the list changes (rebuild), not at every click: the lines, and one row per customer with its deliveries
@@ -43,16 +43,10 @@ function customersShown() {
   else if (s === 'route' || s === 'day') rows.sort((a, b) => { const x = (a.deliveries || [])[0] || {}, y = (b.deliveries || [])[0] || {}; return s === 'route' ? U.byRoute(x.route || 'zz', y.route || 'zz') || U.dayIndex(x.day) - U.dayIndex(y.day) : U.dayIndex(x.day) - U.dayIndex(y.day) || U.byRoute(x.route || 'zz', y.route || 'zz'); });
   return rows;
 }
-// Joe 11/2: the Customers list shows Chain, Account, Customer, DC (its name only), Address, then a column per day (Sun to Sat)
+// Joe 11/2: the By Customer list shows Chain, Account, Customer, DC (its name only), then a column per day (Sun to Sat)
 // holding the route that delivers that day, with no stop number.
 const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
-// Joe 11/2: a Group column on the Directory, picked from a drop-down, with a new group added from the same list.
-const groupsNow = () => [...new Set(Object.values(data.customers).map(c => c.group).filter(Boolean))].sort(U.byName);
-// The group list is worked out once per drawing (Joe 11/2: with 5,118 customers, once per line made the screen crawl).
-let groupList = [];
-const groupCell = (c) => !data.canEdit ? e(c.group || '') : '<select class="grp" data-key="' + e(c.key) + '" aria-label="Group for ' + e(c.name) + '"><option value="">No group</option>' +
-  groupList.map(g => '<option' + (g === c.group ? ' selected' : '') + '>' + e(g) + '</option>').join('') + '<option value="+">+ Add a group…</option></select>';
 // Only the first lines are drawn; "Show more" adds the next ones. Narrowing the boxes starts again from the top.
 const PAGE = 300;
 let shown = PAGE;
@@ -61,7 +55,7 @@ const moreRow = (rows, cols) => rows.length > shown ? '<tr class="more"><td cols
   ' &nbsp; <button type="button" data-more="' + PAGE + '">Show ' + Math.min(PAGE, rows.length - shown) + ' more</button> <button type="button" data-more="all">Show all</button></td></tr>' : '';
 // Joe 11/2: the Directory tab, "just ... the customer list with the addresses and the GPS coordinates ... and the phone numbers. Not the routes".
 const gpsText = (c) => (c.lat && c.lon) ? Number(c.lat).toFixed(5) + ', ' + Number(c.lon).toFixed(5) : '';
-const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone], ['Address check', c => c.addressCheck || '']];
+const dirCols = [['DC', c => dcPlain(c.dc), 1], ['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['Address', c => U.addressLine(c)], ['GPS', c => gpsText(c)], ['Phone', c => c.phone], ['Address check', c => c.addressCheck || '']];
 const dayCols = U.DAYS.map(d => [dayName(d).slice(0, 3), c => routesOn(c, d), 1]);
 
 function draw() {
@@ -69,25 +63,23 @@ function draw() {
   ['route', 'day'].forEach(id => { $(id).closest('.field').hidden = view === 'list'; });
   if (!data) return;
   const fl = f();
-  groupList = groupsNow();
   drawFooter();
   if (view === 'list') {
     const rows = customersShown();
-    $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th class="l" style="width:13%">Group</th><th style="width:7%">Account</th><th class="l" style="width:18%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
-    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
+    $('thead').innerHTML = '<tr><th style="width:7%">DC</th><th style="width:5%">Chain</th><th style="width:7%">Account</th><th class="l" style="width:20%">Customer</th><th class="l">Address</th><th style="width:11%">GPS</th><th class="l" style="width:9%">Phone</th><th class="l" style="width:10%">Address check</th></tr>';
+    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(dcPlain(c.dc)) + '</td><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td>' +
       '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
-      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td><td class="l" title="' + e([c.addressNote, c.addressProposed && ('Proposed: ' + c.addressProposed), c.gpsFrom && ('GPS from ' + c.gpsFrom)].filter(Boolean).join(' · ')) + '"><small>' + e(c.addressCheck || '') + '</small></td></tr>').join('') + moreRow(rows, 9) ||
-      '<tr><td colspan="9" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+      '<td>' + (gpsText(c) ? '<a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(gpsText(c)) + '</a>' : '<span class="warnline">-</span>') + '</td><td class="l">' + e(c.phone) + '</td><td class="l" title="' + e([c.addressNote, c.addressProposed && ('Proposed: ' + c.addressProposed), c.gpsFrom && ('GPS from ' + c.gpsFrom)].filter(Boolean).join(' · ')) + '"><small>' + e(c.addressCheck || '') + '</small></td></tr>').join('') + moreRow(rows, 8) ||
+      '<tr><td colspan="8" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
     const rows = customersShown();
-    // Joe 11/2: Chain and the day columns narrower again, and the Group drop-down here too.
-    $('thead').innerHTML = '<tr><th style="width:4%">Chain</th><th class="l" style="width:11%">Group</th><th style="width:7%">Account</th><th class="l" style="width:17%">Customer</th><th style="width:7%">DC</th><th class="l">Address</th>' +
-      U.DAYS.map(d => '<th class="dayroute" style="width:3.9%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td class="l grp-cell">' + groupCell(c) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td>' + e(dcPlain(c.dc)) + '</td>' +
-      '<td class="l" title="' + e(U.addressLine(c)) + '">' + (U.addressLine(c) ? e(U.addressLine(c)) : '<span class="warnline">No address yet</span>') + '</td>' +
-      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') + moreRow(rows, 13) ||
-      '<tr><td colspan="13" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+    // Joe 11/3: "doesn't need the address in this. And doesn't need the group in this." The group is set on Customers.
+    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:9%">Account</th><th class="l">Customer</th><th class="l" style="width:14%">DC</th>' +
+      U.DAYS.map(d => '<th class="dayroute" style="width:6.5%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
+    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td class="l">' + e(dcPlain(c.dc)) + '</td>' +
+      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') + moreRow(rows, 11) ||
+      '<tr><td colspan="11" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else {
     const lines = U.pick(allLines, fl);
@@ -109,7 +101,7 @@ function drawFooter() {
     (im.counts.noLoadSeq ? ' · <span class="warnline">' + im.counts.noLoadSeq + ' stops have no load sequence yet</span>' : '') + '</span>',
     ms && '<span><b>Master list:</b> ' + e(lastUpload(ms)) + '</span>'].filter(Boolean).join('');
 }
-const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Administration, Master Customer List.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
+const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Customers.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
 
 /* ---------- a customer's card ---------- */
 function panel(title, body) {
@@ -166,7 +158,7 @@ function openImport() {
     '<label>Route Menu workbook (.xlsb, .xlsx)<input type="file" id="i-menu" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<button type="button" class="primary" id="i-go">Upload</button><div id="i-msg"></div>' +
-    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on <b>Administration</b>, <b>Master Customer List</b>.</p><hr>' +
+    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on <b>Customers</b>, Upload master list.</p><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
@@ -178,7 +170,7 @@ function openImport() {
       const X = await loadXlsx(), wb = X.read(await mf.arrayBuffer(), { type: 'array' });
       const tab = findSheet(wb, 'Customer By Route');
       const menu = tab ? U.menuStops(sheetRows(X, wb, tab)) : null;
-      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on Administration, Master Customer List.', 'bad');
+      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on Customers, Upload master list.', 'bad');
       const accounts = new Set(menu.stops.concat(menu.unrouted).map(s => s.account).filter(Boolean)), names = new Set(menu.stops.concat(menu.unrouted).map(s => U.nameKey(s.name)));
       const at = findSheet(wb, 'Address List'), gt = findSheet(wb, 'GPS Address');
       const allAddr = at ? U.addressList(sheetRows(X, wb, at)) : {}, allGps = gt ? U.gpsAddresses(sheetRows(X, wb, gt)) : {};
@@ -209,7 +201,7 @@ function printItems() {
     { label: 'This list, as shown', note: (filt ? 'Only ' + filt : 'Everything') + ', in this order', html: () => view === 'list'
       ? printDoc('Customer directory', [tablePage('Customer directory · ' + pn, filt || 'All customers', customersShown(), dirCols)])
       : view === 'customer'
-      ? printDoc('Customers', [tablePage('Customers · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Group', c => c.group || ''], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc), 1], ['Address', c => U.addressLine(c)]].concat(dayCols))])
+      ? printDoc('Routes', [tablePage('Routes · ' + pn, filt || 'All customers', customersShown(), [['Chain', c => c.chain, 1], ['Account', c => c.account], ['Customer', c => c.name], ['DC', c => dcPlain(c.dc)]].concat(dayCols))])
       : printDoc('Deliveries', [tablePage('Deliveries · ' + pn, filt || 'All deliveries', U.pick(allLines, fl), lineCols, view === 'route' ? (l => 'Route ' + l.route + ' · ' + dayName(l.day)) : (l => dayName(l.day) + ' · Route ' + l.route))]) },
     { label: 'Route sequence sheets for the office', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + (filt ? ' (' + filt + ')' : '') + ', one page each', html: () => printDoc('Route sequence', rds.map(rd => routeDayPage(rd, data.customers, 'office', pn))) },
     { label: 'Driver route book pages', note: rds.length + ' route day' + (rds.length === 1 ? '' : 's') + ', with keys, time in / out and the load map', html: () => printDoc('Route book', rds.map(rd => routeDayPage(rd, data.customers, 'driver', pn))) },
@@ -238,25 +230,6 @@ let typing = null;
   shown = PAGE; clearTimeout(typing);
   if (id === 'q') typing = setTimeout(draw, 200); else draw();
 }));
-async function saveGroup(key, group) {
-  try { const out = await saveStep('saveCustomer', { key, fields: { group } }); data.customers[key] = out.customer; showError(''); }
-  catch (err) { showError(serverText(err, 'the customer list')); }
-  rebuild();
-}
-$('rows').addEventListener('change', ev => {
-  const sel = ev.target.closest('select.grp');
-  if (sel) {
-    if (sel.value !== '+') return saveGroup(sel.dataset.key, sel.value);
-    // "+ Add a group…": the box becomes a place to type the new group's name; Enter or leaving it saves it.
-    const box = document.createElement('input');
-    box.className = 'grp-new'; box.placeholder = 'New group name'; box.maxLength = U.LIMITS.group; box.dataset.key = sel.dataset.key;
-    sel.replaceWith(box); box.focus();
-    let done = false;
-    const finish = () => { if (done) return; done = true; const v = box.value.trim(); if (v) saveGroup(box.dataset.key, v); else draw(); };
-    box.addEventListener('keydown', k => { if (k.key === 'Enter') finish(); if (k.key === 'Escape') { done = true; draw(); } });
-    box.addEventListener('blur', finish);
-  }
-});
 $('rows').addEventListener('click', ev => {
   const more = ev.target.closest('button[data-more]');
   if (more) { shown = more.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); return; }

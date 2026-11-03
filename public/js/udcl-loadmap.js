@@ -47,7 +47,7 @@ function draw() {
     $('kiosk-routes').hidden = false;
     $('kiosk-routes').innerHTML = list.map(r => '<button type="button" data-route="' + e(r) + '" aria-pressed="' + (r === route) + '">' + e(r) + '</button>').join('') || '<span>No routes on ' + U.DAY_NAMES[day] + '.</span>';
   }
-  $('truck').innerHTML = rd ? truckHtml(map, { edit: canEdit() }) : '<p>' + (data.routeDays.length ? 'Pick a route and day.' : 'The customer list is empty. An administrator imports it on the Customers screen.') + '</p>';
+  $('truck').innerHTML = rd ? truckHtml(map, { edit: canEdit() }) : '<p>' + (data.routeDays.length ? 'Pick a route and day.' : 'The customer list is empty. An administrator imports it on the Routes screen.') + '</p>';
   const stops = rd ? rd.stops || [] : [];
   // Joe 11/1: "grab it, move it up and down. And that is the run sequence ... and then I would like to be able to edit the load
   // sequence." An Administrator or Manager drags a line to change the run order and types its load sequence; the kiosk only shows.
