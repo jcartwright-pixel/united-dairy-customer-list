@@ -8,7 +8,8 @@
 // Joe 11/3: "There is where I want to be able to edit the group", in the Group column, before Chain. Click a group to change it,
 // or pick lines and set one group for all of them. The groups themselves are added on Administration.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
-import { readList, saveStep, printMenu, printDoc, tablePage, U } from './udcl.js';
+import { readList, saveStep, savedView, saveView, printMenu, printDoc, tablePage, U } from './udcl.js';
+import { openCard, groupOptions, askNewGroup } from './udcl-card.js';
 
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
@@ -31,7 +32,11 @@ const GROUP = 3, NAME = 6, CITY = 9;
 const PRESETS = { location: [[1, 1], [NAME, 1]], name: [[NAME, 1]], city: [[CITY, 1], [NAME, 1]], status: [[0, -1], [1, 1], [NAME, 1]] };
 const DC_NUM = (c) => Number(U.branchOf(c.dc)) || 99999;
 const PAGE = 300;
-let order = PRESETS.location, shown = PAGE;
+// Joe 11/3: "save the view option". The sort (a Sort by choice or the heading pressed), the location and the status stay as they
+// were left, on this computer; the screen opens with them.
+let saved = savedView('customers');
+let order = Array.isArray(saved.order) && saved.order.every(x => Array.isArray(x) && COLS[x[0]] && (x[1] === 1 || x[1] === -1)) ? saved.order : PRESETS.location, shown = PAGE;
+const remember = () => saveView('customers', { sort: $('sort').value, order, dc: $('dcpick').value, status: $('status').value });
 let rowsNow = [];                 // the customers the boxes pick, in order (drawn or not)
 const picked = new Set();         // the customers picked for Make inactive / Make active
 let anchor = null;                // where a Shift-click run starts
@@ -99,10 +104,11 @@ function drawStats() {
 
 function drawLocations() {
   const all = Object.values(data.customers), dcs = [...new Set(all.map(c => U.branchOf(c.dc)).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
-  const keep = $('dcpick').value, none = all.some(c => !U.branchOf(c.dc));
+  const keep = saved ? saved.dc || '' : $('dcpick').value, none = all.some(c => !U.branchOf(c.dc));
   $('dcpick').innerHTML = '<option value="">All locations</option>' + dcs.map(d => '<option value="' + e(d) + '">' + e((d + ' ' + dcLabel(d).replace(/^\d+\s*/, '')).trim()) + '</option>').join('') +
     (none ? '<option value="none">No branch</option>' : '');
   $('dcpick').value = dcs.includes(keep) || (keep === 'none' && none) ? keep : '';
+  saved = null;
 }
 
 /** The picked count and its buttons in the top bar; the box on the heading shows all, some or none of the shown ones picked. */
@@ -112,32 +118,39 @@ function drawPicked() {
   $('table-wrap').classList.toggle('has-picked', picked.size > 0);   // room under the last line for the floating bar
   $('picked-n').textContent = picked.size.toLocaleString() + ' picked';
   $('pick-group').hidden = !data.canEdit;
-  $('pick-group').innerHTML = '<option value="">Set group…</option>' + groupOptions() + '<option value="-">No group</option>';
+  $('pick-group').innerHTML = '<option value="">Set group…</option>' + groupsNow().map(g => '<option>' + e(g) + '</option>').join('') + '<option value="-">No group</option><option value="+">+ New group…</option>';
+  $('pick-edit').hidden = picked.size !== 1;
   const inView = rowsNow.filter(c => picked.has(c.key)).length, all = $('pick-all');
   if (all) { all.classList.toggle('all', !!rowsNow.length && inView === rowsNow.length); all.classList.toggle('some', inView > 0 && inView < rowsNow.length); }
 }
 
-/* ---------- groups: click one to change it, or set one group on every picked line ---------- */
+/* ---------- groups: click one to change it, or set one group on every picked line; "+ New group…" adds one (Joe 11/3) ---------- */
 const groupsNow = () => data.groups || [];
-const groupOptions = (now) => groupsNow().map(g => '<option' + (g === now ? ' selected' : '') + '>' + e(g) + '</option>').join('');
+const setGroups = (list) => { data.groups = list; drawPicked(); };
 function showGroup(c) { const tr = rowOf(c.key); if (tr) tr.cells[1 + GROUP].innerHTML = groupCell(c); }
 $('rows').addEventListener('click', ev => {
   const b = ev.target.closest('button.grp'); if (!b) return;
   const c = data.customers[b.dataset.key]; if (!c) return;
-  if (!groupsNow().length) { $('save-msg').textContent = 'There are no groups yet. Add them on Administration, Groups.'; return; }
   const sel = document.createElement('select');
   sel.className = 'grp-pick'; sel.setAttribute('aria-label', 'Group for ' + c.name);
-  sel.innerHTML = '<option value="">No group</option>' + groupOptions(c.group || '');
+  sel.innerHTML = groupOptions(groupsNow(), c.group || '', true);
   b.replaceWith(sel); sel.focus();
-  let done = false;
-  const finish = (save) => { if (done) return; done = true; if (save && sel.value !== (c.group || '')) setGroup([c.key], sel.value); else showGroup(c); };
-  sel.addEventListener('change', () => finish(true));
-  sel.addEventListener('blur', () => finish(false));
-  sel.addEventListener('keydown', k => { if (k.key === 'Escape') { k.stopPropagation(); finish(false); } });
+  let done = false, asking = false;
+  const finish = (to) => { if (done) return; done = true; if (to !== null && to !== (c.group || '')) setGroup([c.key], to); else showGroup(c); };
+  sel.addEventListener('change', async () => {
+    if (sel.value !== '+') return finish(sel.value);
+    asking = true;
+    const name = await askNewGroup(sel, setGroups);
+    finish(name || null);
+  });
+  sel.addEventListener('blur', () => { if (!asking) finish(null); });
+  sel.addEventListener('keydown', k => { if (k.key === 'Escape') { k.stopPropagation(); finish(null); } });
 });
-$('pick-group').addEventListener('change', () => {
-  const v = $('pick-group').value; if (!v) return;
-  setGroup([...picked], v === '-' ? '' : v);
+$('pick-group').addEventListener('change', async () => {
+  const box = $('pick-group'), v = box.value; if (!v) return;
+  const name = v === '+' ? await askNewGroup(box, setGroups) : v === '-' ? '' : v;
+  if (v === '+' && !name) { box.value = ''; return; }
+  setGroup([...picked], name);
 });
 async function setGroup(keys, group) {
   const list = keys.map(k => data.customers[k]).filter(Boolean), was = list.map(c => [c, c.group || '']);
@@ -198,15 +211,35 @@ $('thead').addEventListener('click', ev => {
   const b = ev.target.closest('button.sorter'); if (!b) return;
   const i = Number(b.dataset.col), was = order[0];
   order = [[i, was[0] === i ? -was[1] : 1]].concat(i === NAME ? [] : [[NAME, 1]]);
-  $('sort').value = ''; shown = PAGE; draw();
+  $('sort').value = ''; shown = PAGE; remember(); draw();
 });
 $('pick-clear').onclick = () => { picked.clear(); anchor = null; $('rows').querySelectorAll('tr.picked').forEach(tr => tr.classList.remove('picked')); drawPicked(); };
 $('pick-off').onclick = () => setStatus([...picked], true);
 $('pick-on').onclick = () => setStatus([...picked], false);
+// Double-click a status to switch it; double-click anywhere else on a line to open the customer's card (Joe 11/3: edit it).
 $('rows').addEventListener('dblclick', ev => {
-  const b = ev.target.closest('button.st'); if (!b) return;
-  const c = data.customers[b.dataset.key]; if (c) setStatus([c.key], !c.inactive);
+  const b = ev.target.closest('button.st');
+  if (b) { const c = data.customers[b.dataset.key]; if (c) setStatus([c.key], !c.inactive); return; }
+  if (ev.target.closest('a, button, select, input')) return;
+  const tr = ev.target.closest('tr[data-key]'); if (tr) { setPicked(tr.dataset.key, false); drawPicked(); editCustomer(tr.dataset.key); }
 });
+$('pick-edit').onclick = () => editCustomer([...picked][0]);
+
+/* ---------- a customer's card: every box, the account number too (udcl-card.js) ---------- */
+function editCustomer(key) {
+  const c = data.customers[key]; if (!c) return;
+  const on = (data.routeDays || []).filter(rd => (rd.stops || []).some(s => s.key === key)).map(rd => 'Route ' + rd.route + ' ' + (U.DAY_NAMES[rd.day] || rd.day));
+  openCard({ data, key, routesHtml: on.length ? on.map(e).join('<br>') : 'Not on any route day', onGroups: setGroups, onSaved: (cust, oldKey, out) => {
+    (out.routeDays || []).forEach(rd => { const i = (data.routeDays || []).findIndex(x => x.route === rd.route && x.day === rd.day); if (i >= 0) data.routeDays[i] = rd; });
+    if (oldKey && oldKey !== cust.key) {
+      if (picked.delete(oldKey)) picked.add(cust.key);
+      rowsNow = rowsNow.map(x => (x.key === oldKey ? cust : x));
+    } else rowsNow = rowsNow.map(x => (x.key === cust.key ? cust : x));
+    const tr = rowOf(oldKey || cust.key);
+    if (tr) tr.outerHTML = rowHtml(cust);
+    drawStats(); drawPicked();
+  } });
+}
 
 /* ---------- Active / Inactive: shown at once, saved in one call, only those lines redrawn ---------- */
 function showStatus(c, saving) {
@@ -281,9 +314,12 @@ async function upload() {
 $('i-addr-go').onclick = upload;
 
 /* ---------- the boxes ---------- */
-$('sort').addEventListener('change', () => { if (PRESETS[$('sort').value]) { order = PRESETS[$('sort').value]; shown = PAGE; draw(); } });
+$('sort').addEventListener('change', () => { if (PRESETS[$('sort').value]) { order = PRESETS[$('sort').value]; shown = PAGE; remember(); draw(); } });
+// The boxes that do not wait for the list take the remembered view at once (the location box is filled with the list).
+if (saved.sort === '' || PRESETS[saved.sort]) $('sort').value = saved.sort;
+if ([...$('status').options].some(o => o.value === saved.status)) $('status').value = saved.status;
 let typing = null;
-['q', 'dcpick', 'status'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', () => { shown = PAGE; clearTimeout(typing); if (id === 'q') typing = setTimeout(draw, 200); else draw(); }));
+['q', 'dcpick', 'status'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', () => { shown = PAGE; clearTimeout(typing); if (id === 'q') typing = setTimeout(draw, 200); else { remember(); draw(); } }));
 $('rows').addEventListener('click', ev => { const m = ev.target.closest('button[data-more]'); if (m) { shown = m.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); } });
 printMenu($('udcl-print-menu'), () => !data ? [] : [{ label: 'This list, as shown', note: 'In this order, with the boxes as they are', html: () => printDoc('Master customer list',
   [tablePage('Master customer list · ' + data.plantName, $('count').textContent, shownRows(), COLS.filter(c => !/Coordinate|Second/.test(c[0])).map(c => [c[0], c[1], c[2]]))]) }]);

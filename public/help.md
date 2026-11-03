@@ -25,8 +25,9 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). An **inactive** customer (set on **Customers**) is not shown here, nor anywhere else. A customer's group is set on **Customers**.
 2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory`), **DC** and **Chain**. **Sort by** changes the order.
-3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
-4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
+3. Tap a line to open the customer's card: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, address, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it. A new account number moves the customer and its route day stops to the new number. In **Group**, `+ New group…` (administrators) adds a group: type its name and press Enter.
+4. The screen opens the way you left it: the tab, **Route**, **Day**, **DC**, **Chain** and **Sort by** are kept on this computer.
+5. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
 
 ### Buttons
 
@@ -60,12 +61,14 @@ The **Customers** tab (administrators only): the master customer list, every cus
 4. Narrow the list with **Find** (name, account, city, ZIP, phone, route), the location box and the status box, all in the one bar above the list.
 5. To make one customer inactive, double-click its **Status** (`Active` turns to `Inactive`). Double-click again to make it active.
 6. To change many at once: click a line to pick it (click again to let go), Shift-click another line to pick every line between, or hold the mouse down and drag down the list. The box at the top of the first column picks every customer the boxes show (use **Find** for a chain or a name first). Then press `Make inactive` or `Make active` on the bar at the bottom, or pick a group in `Set group…` to put them all in it. `Clear` (or Esc) lets go of the picked lines.
-7. **Group** (before **Chain**): click a customer's group (or the empty spot) and pick its group from the list; it saves at once. The Sales app groups its customers by this. The groups themselves are added on **Administration**, **Groups**.
+7. **Group** (before **Chain**): click a customer's group (or the empty spot) and pick its group from the list; it saves at once. `+ New group…` at the end of the list adds a group: type its name and press Enter. The Sales app groups its customers by this. Groups are renamed and removed on **Administration**, **Groups**.
+8. To edit a customer, double-click its line (anywhere but **Status**), or pick one line and press `Edit customer`. The card has every box: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, the address, contact, keys and notes. Each box saves when you leave it. A new account number moves the customer and its route day stops to the new number; a number another customer has is refused.
+9. The screen opens the way you left it: **Sort by** (or the heading you pressed), the location and the status are kept on this computer.
 
 ### Buttons
 
 - **Status**: double-click to switch between `Active` and `Inactive`. It saves at once. A customer still on a route asks first: making it inactive takes it off its route days.
-- `Make inactive`, `Make active`, `Set group…` and `Clear`: on the bar that shows when lines are picked.
+- `Make inactive`, `Make active`, `Edit customer` (one line picked), `Set group…` and `Clear`: on the bar that shows when lines are picked.
 - A customer whose name starts with three periods (`...`) is inactive: an upload makes it inactive, and the screen switches any still active.
 - `Upload`: reads the master file. It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and ZIP. **Status** (Active or Inactive), **Latitude**, **Longitude**, **Phone**, **Contact**, **Group**, **Match status**, **Matched address** and **Coordinate source** are read when they are there. A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.
 - `What an upload changes` (in the upload box) lists what an upload changes, keeps and removes.

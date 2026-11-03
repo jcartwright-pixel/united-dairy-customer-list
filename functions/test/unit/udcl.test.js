@@ -543,3 +543,21 @@ test('Joe 11/3: groups are added, renamed and removed on Administration, and set
   const empty = await S.udclCall(db, mgr, PLANT, { op: 'setGroup', keys: ['5002'], group: '' }, now);
   assert.match(empty.message, /has no group now/);
 });
+
+test('Joe 11/3: a new account number moves the customer to its new key, with its route day stops', async () => {
+  const { db } = await imported();
+  await assert.rejects(S.udclCall(db, disp, PLANT, { op: 'changeAccount', key: '5001', account: '6001' }, now), /Administrator or Manager/);
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'changeAccount', key: '5001', account: '5002' }, now), /already BEST FOODS #2/);
+  const out = await S.udclCall(db, mgr, PLANT, { op: 'changeAccount', key: '5001', account: '6001' }, now);
+  assert.equal(out.oldKey, '5001'); assert.equal(out.customer.key, '6001'); assert.equal(out.customer.account, '6001'); assert.equal(out.customer.name, 'ACME MARKET');
+  assert.equal(out.routeDays.length, 2); assert.match(out.message, /has account 6001 now, on route 900/);
+  assert.equal(db.docs.has('udclCustomers/' + PLANT + '__5001'), false);
+  const v = await S.udclCall(db, mgr, PLANT, { op: 'view' });
+  assert.ok(v.customers['6001']);
+  assert.ok(v.routeDays.filter(rd => rd.stops.some(s => s.key === '6001' && s.account === '6001')).length === 2, 'its stops follow');
+  assert.ok(v.routeDays.every(rd => rd.stops.every(s => s.key !== '5001')));
+  assert.ok((await S.salesRows(db, PLANT)).rows.some(r => r.account === '6001'), 'the Sales app gets the new number');
+  // The same key (only the way it is written changes) just saves the number.
+  const same = await S.udclCall(db, mgr, PLANT, { op: 'changeAccount', key: '6001', account: '6001.0' }, now);
+  assert.equal(same.customer.key, '6001'); assert.deepEqual(same.routeDays, []);
+});
