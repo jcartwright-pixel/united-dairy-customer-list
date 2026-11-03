@@ -448,3 +448,13 @@ test('Joe 11/2: the master list reads an Active / Status column', () => {
   const rows = U.fullListRows([['Status', 'DC', 'Chain', 'Account', 'Customer', 'Street', 'City'], ['Inactive', 30, 0, 1, 'A', '1 X ST', 'T'], ['Active', 30, 0, 2, 'B', '2 X ST', 'T'], ['', 30, 0, 3, 'C', '3 X ST', 'T']]);
   assert.deepEqual(rows.map(r => r.inactive), [true, false, undefined]);
 });
+
+// Joe 11-3-26: Customers & Routes ticked or unticked per person in the United Dairy Hub's People & Access.
+test('the hub\'s app ticks decide who opens Customers & Routes once saved', async () => {
+  const db = fakeDb(people);
+  await S.udclCall(db, disp, PLANT, { op: 'view' });
+  db.docs.set('appAccess/disp@example.com', { apps: ['operations', 'fuel'] });
+  await assert.rejects(S.udclCall(db, disp, PLANT, { op: 'view' }), /do not have Customers & Routes/);
+  db.docs.set('appAccess/disp@example.com', { apps: ['operations', 'customers'] });
+  await S.udclCall(db, disp, PLANT, { op: 'view' });
+});
