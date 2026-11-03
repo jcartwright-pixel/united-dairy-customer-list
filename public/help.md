@@ -59,11 +59,14 @@ On **Administration** (administrators only): the master customer list, every cus
 2. To upload: press `Upload master list` (top right), pick the file (.xlsx, .csv or .txt) and press `Upload`. Wait for the green line; five thousand customers take about a minute. `Close` (or Esc) puts the list back.
 3. **Sort by**: `Location, then A to Z` (the first choice), `Customer name, A to Z`, `City, then A to Z` or `Inactive first`. Or press any heading to sort by it; press it again for the other way. The arrow shows which heading sorts the list.
 4. Narrow the list with **Find** (name, account, city, ZIP, phone, route), the location box and the status box, all in the one bar above the list.
-5. To make a customer inactive, change its **Status** box (the first column) to `Inactive`. Change it back to `Active` to show it again.
+5. To make one customer inactive, double-click its **Status** (`Active` turns to `Inactive`). Double-click again to make it active.
+6. To change many at once: click a line to pick it (click again to let go), Shift-click another line to pick every line between, or hold the mouse down and drag down the list. The box at the top of the first column picks every customer the boxes show (use **Find** for a chain or a name first). Then press `Make inactive` or `Make active` on the bar at the bottom. `Clear` (or Esc) lets go of the picked lines.
 
 ### Buttons
 
-- **Status** (first column): `Active` or `Inactive`. It saves at once. A customer still on a route asks first: making it inactive takes it off its route days.
+- **Status**: double-click to switch between `Active` and `Inactive`. It saves at once. A customer still on a route asks first: making it inactive takes it off its route days.
+- `Make inactive`, `Make active` and `Clear`: on the bar that shows when lines are picked.
+- A customer whose name starts with three periods (`...`) is inactive: an upload makes it inactive, and the screen switches any still active.
 - `Upload`: reads the master file. It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and ZIP. **Status** (Active or Inactive), **Latitude**, **Longitude**, **Phone**, **Contact**, **Group**, **Match status**, **Matched address** and **Coordinate source** are read when they are there. A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.
 - `What an upload changes` (in the upload box) lists what an upload changes, keeps and removes.
 - The line at the bottom has the totals (customers, active, inactive, with GPS, with a phone, with no address yet) and when the master list was last uploaded, from which file and by whom.

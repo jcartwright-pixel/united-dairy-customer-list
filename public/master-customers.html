@@ -15,7 +15,8 @@
 <!-- Joe 11/2: "basically a master customer list. It will show all of them", Active or Inactive first, a Sort by box and a sort on
      every heading. Administrators only.
      Joe 11/3: "get rid of the garbage ... I have more usable room for the list." One slim bar on top (title, the boxes, Upload,
-     Print), the list fills the rest, the totals sit in one line at the bottom, and the upload opens in its own box. -->
+     Print), the list fills the rest, the totals sit in one line at the bottom, and the upload opens in its own box.
+     Joe 11/3: double-click a status to switch it; pick rows (click, Shift-click, drag) and Make inactive / Make active. -->
 <body class="fill udcl-page ml-page" data-help="master-customers">
   <div class="signin" id="signin" hidden>
     <h1>Master Customer List</h1>
@@ -51,6 +52,7 @@
           <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
         </table>
       </div>
+      <div class="ml-picked" id="picked" hidden role="toolbar" aria-label="Picked customers"><b id="picked-n"></b><button type="button" id="pick-off">Make inactive</button><button type="button" id="pick-on">Make active</button><button type="button" id="pick-clear" class="quiet">Clear</button></div>
       <div class="ml-foot"><span id="card-stats"></span><span id="card-last"></span><span id="save-msg"></span></div>
     </div>
   </div>

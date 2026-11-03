@@ -99,17 +99,19 @@ async function ph0(browser) {
     await m.goto(m.emailFor('master-customers.html'));
     await m.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await m.textContent('#udcl-nav a[aria-current="page"]'), 'Administration');
-    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['Status', 'DC ▲', 'Route', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Group', 'Match status', 'Coordinate source']);
+    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['', 'Status', 'DC ▲', 'Route', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Group', 'Match status', 'Coordinate source']);
     assert.match(await m.textContent('#card-stats'), /9\s*customers/);
     // Joe 11/3: the upload sits in its own box, so the list keeps the screen.
     assert.equal(await m.isHidden('#upload-box'), true);
     await m.click('#upload-open');
-    await m.setInputFiles('#i-addr', { name: 'Made Up Master List.csv', mimeType: 'text/csv', buffer: Buffer.from('DC,Chain,Account,Customer,Street,City,State,Zip,Latitude,Longitude,Phone,Group\n30,0,1196,ACORN CORNER MARKET,12 ELM ST,MAPLETON,PA,15401,39.9,-79.7,555-0199,Corner Stores\n') });
+    await m.setInputFiles('#i-addr', { name: 'Made Up Master List.csv', mimeType: 'text/csv', buffer: Buffer.from('DC,Chain,Account,Customer,Street,City,State,Zip,Latitude,Longitude,Phone,Group\n30,0,1196,ACORN CORNER MARKET,12 ELM ST,MAPLETON,PA,15401,39.9,-79.7,555-0199,Corner Stores\n30,0,7001,BIRCH STREET DELI,4 BIRCH ST,MAPLETON,PA,15401,,,,\n30,0,7002,CEDAR MINI MART,9 CEDAR ST,MAPLETON,PA,15401,,,,\n30,0,7003,...OLD PINE MARKET,1 PINE ST,MAPLETON,PA,15401,,,,\n') });
     // The Excel reader comes from the internet; a test machine stands in a small CSV reader for it.
     await m.evaluate(() => { if (!window.XLSX) window.XLSX = { read: (buf) => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: new TextDecoder().decode(buf) } }), utils: { sheet_to_json: (t) => t.trim().split('\n').map(l => l.split(',')) } }; });
     await m.click('#i-addr-go');
     await m.waitForSelector('#i-msg .good, #i-msg .bad', { timeout: 60000 });
     assert.ok(await m.$('#i-msg .good'), await m.textContent('#i-msg'));
+    // Joe 11/3: a name that starts with "..." comes in inactive.
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__7003').get()).data().inactive, true);
     const acorn = (await db().collection('udclCustomers').doc('fac_uniontown__1196').get()).data();
     assert.equal(acorn.phone, '555-0199'); assert.equal(acorn.address2, ''); assert.equal(acorn.group, 'Corner Stores'); assert.equal(acorn.lat, 39.9);
     await m.click('#upload-close');
@@ -118,16 +120,40 @@ async function ph0(browser) {
     assert.match(await m.textContent('#rows tr[data-key="1196"]'), /39\.900000.*-79\.700000.*555-0199/);
     // Sorts: Customer name; a heading pressed twice goes the other way.
     await m.selectOption('#sort', 'name');
-    assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '40121');
+    assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '7003', 'a name starting with dots sorts first');
     await m.click('#thead button[data-col="4"]'); await m.click('#thead button[data-col="4"]');
     assert.equal(await m.getAttribute('#thead button[data-col="4"]', 'aria-sort'), 'descending');
     assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '40463');
-    // Inactive: it asks (the customer is on route 808 Monday), then it is off the route and out of Customers.
+    // Joe 11/3: double-click a status to switch it. It asks first (the customer is on route 808 Monday), then it is off the route.
     m.once('dialog', d => d.accept());
-    await m.selectOption('#rows select.status[data-key="2603"]', 'Inactive');
+    await m.dblclick('#rows button.st[data-key="2603"]');
     await m.waitForFunction(() => /inactive/.test(document.getElementById('save-msg').textContent));
     assert.match(await m.textContent('#save-msg'), /taken off route 808 Monday/);
+    assert.equal(await m.textContent('#rows button.st[data-key="2603"]'), 'Inactive');
     assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__2603').get()).data().inactive, true);
+    // Pick a run of rows (click, then Shift-click) and make them inactive together, then active again.
+    // Pick rows: a click picks one, Shift-click picks the run between, Clear lets go.
+    const shownKeys = await m.$$eval('#rows tr[data-key]', x => x.map(r => r.dataset.key));
+    assert.equal(await m.isHidden('#picked'), true);
+    await m.click('#rows tr[data-key="' + shownKeys[0] + '"] td:nth-child(7)');
+    await m.click('#rows tr[data-key="' + shownKeys[3] + '"] td:nth-child(7)', { modifiers: ['Shift'] });
+    assert.equal(await m.textContent('#picked-n'), '4 picked');
+    await m.click('#pick-clear');
+    assert.equal(await m.isHidden('#picked'), true);
+    // Two customers on no route, picked one click each, made inactive together and then active again.
+    const onRoute = new Set((await db().collection('udclRouteDays').get()).docs.flatMap(d => (d.data().stops || []).map(s => s.key)));
+    const keys = ['7001', '7002'].filter(k => !onRoute.has(k) && shownKeys.includes(k));
+    assert.equal(keys.length, 2, 'two customers on no route');
+    const pickBoth = async () => { for (const k of keys) await m.click('#rows tr[data-key="' + k + '"] td:nth-child(7)'); assert.equal(await m.textContent('#picked-n'), '2 picked'); };
+    await pickBoth();
+    await m.click('#pick-off');
+    await m.waitForFunction(() => /2 customers are inactive now/.test(document.getElementById('save-msg').textContent));
+    for (const k of keys) assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__' + k).get()).data().inactive, true, k);
+    assert.equal(await m.isHidden('#picked'), true, 'the picked rows let go after the change');
+    await pickBoth();
+    await m.click('#pick-on');
+    await m.waitForFunction(() => /2 customers are active now/.test(document.getElementById('save-msg').textContent));
+    for (const k of keys) assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__' + k).get()).data().inactive, undefined, k);
     await shot(m, 'udcl-1920-master-customers');
     await p.reload();
     await p.waitForSelector('#rows tr[data-key="1196"]');
