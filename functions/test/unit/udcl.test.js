@@ -165,6 +165,12 @@ test('distribution center codes: written the one way; a DC with no name here kee
   assert.equal(U.dcName('61'), '61 DC 61');
   assert.equal(U.dcName('1'), '1 Martins Ferry');
   assert.equal(U.dcName(''), '');
+  // Joe 11/3: route numbers in the DC column (above 80, and 0, 8, 11, 12, 14) are not branches; they are Marietta's customers.
+  assert.equal(U.branchOf('103'), '9'); assert.equal(U.dcRoute('103'), '103'); assert.equal(U.dcName('112'), '9 Marietta');
+  ['0', '8', '12', '14', '234', '605', '815'].forEach(v => { assert.equal(U.branchOf(v), '9', v); assert.equal(U.dcRoute(v), v, v); });
+  assert.equal(U.branchOf(''), '');
+  ['1', '6', '7', '9', '30', '50', '61', '80'].forEach(v => { assert.equal(U.branchOf(v), v, v); assert.equal(U.dcRoute(v), '', v); });
+  assert.equal(U.dcRoute('30'), ''); assert.equal(U.dcRoute(''), '');
   assert.deepEqual(U.cleanCustomer({ dc: '7', name: 'X' }), { name: 'X', dc: '7' });
   assert.equal(U.PLANT_DC.fac_uniontown, '30');
 });

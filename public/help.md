@@ -56,18 +56,21 @@ screens: master-customers.html
 On **Administration** (administrators only): the master customer list, every customer of every location, Active or Inactive, with the address, GPS and phone under the master file's own headings. The master address list is uploaded here, and the addresses, GPS and phones everywhere in the Customer List come from it. An **Inactive** customer shows nowhere else: not on Customers, Route Book, the Truck Load Map, the Sales app or the drivers' route book.
 
 1. Open `Administration`, then `Master Customer List`.
-2. To upload: in the **Upload the master address list** box, press the file box, pick the file (.xlsx, .csv or .txt) and press `Upload`. Wait for the green line; five thousand customers take about a minute.
+2. To upload: press `Upload master list` (top right), pick the file (.xlsx, .csv or .txt) and press `Upload`. Wait for the green line; five thousand customers take about a minute. `Close` (or Esc) puts the list back.
 3. **Sort by**: `Location, then A to Z` (the first choice), `Customer name, A to Z`, `City, then A to Z` or `Inactive first`. Or press any heading to sort by it; press it again for the other way. The arrow shows which heading sorts the list.
-4. Narrow the list with **Find** (name, account, city, ZIP, phone), **Location** and **Status**.
+4. Narrow the list with **Find** (name, account, city, ZIP, phone, route), the location box and the status box, all in the one bar above the list.
 5. To make a customer inactive, change its **Status** box (the first column) to `Inactive`. Change it back to `Active` to show it again.
 
 ### Buttons
 
 - **Status** (first column): `Active` or `Inactive`. It saves at once. A customer still on a route asks first: making it inactive takes it off its route days.
 - `Upload`: reads the master file. It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and ZIP. **Status** (Active or Inactive), **Latitude**, **Longitude**, **Phone**, **Contact**, **Group**, **Match status**, **Matched address** and **Coordinate source** are read when they are there. A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.
-- `What an upload changes` lists what an upload changes, keeps and removes.
+- `What an upload changes` (in the upload box) lists what an upload changes, keeps and removes.
+- The line at the bottom has the totals (customers, active, inactive, with GPS, with a phone, with no address yet) and when the master list was last uploaded, from which file and by whom.
 - `Show 300 more` and `Show all` at the end of the list: it shows 300 lines at a time so the screen stays quick. Find and the boxes still search all of them.
 - `Print` prints the list as shown, in its order.
+
+> **DC** and **Route**: the master file's DC column also holds route numbers for Marietta's customers (103, 107, 112 and the like, and 0, 8, 12 and 14). A number that is not a branch shows under **Route**, and the customer's **DC** is 9 Marietta. Only 1, 6, 7, 9, 30 and 50 (and 51, 61, 71 and 80) are branches.
 
 > Making a customer active again does not put it back on a route. Add it on **Route Book**, or the next Route Menu upload puts it back where the Route Menu has it.
 

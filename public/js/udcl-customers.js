@@ -24,7 +24,7 @@ function fillPickers() {
   keep('day', U.DAYS.map(d => [d, dayName(d)]), 'All days');
   const chains = [...new Set(Object.values(data.customers).map(c => c.chain).filter(Boolean))].sort(U.byRoute);
   keep('chain', chains.map(c => [c, 'Chain ' + c]), 'All chains');
-  const dcs = [...new Set(Object.values(data.customers).map(c => U.dcOf(c.dc)).filter(Boolean))].sort(U.byRoute);
+  const dcs = [...new Set(Object.values(data.customers).map(c => U.branchOf(c.dc)).filter(Boolean))].sort(U.byRoute);
   keep('dcpick', dcs.map(d => [d, dcPlain(d)]), 'All DCs');
   if (params.get('route') && !$('route').value) $('route').value = params.get('route');
 }
@@ -35,7 +35,7 @@ function customersShown() {
   const keys = new Set(lines.map(l => l.key));
   const words = U.text(fl.q).toUpperCase().split(' ').filter(Boolean);
   const rows = allCustomers.filter(c => (keys.has(c.key) || (!fl.route && !fl.day && (!fl.chain || c.chain === fl.chain) && !c.deliveries.length &&
-    words.every(w => c.findText.indexOf(w) >= 0))) && (!fl.dc || U.dcOf(c.dc) === fl.dc));
+    words.every(w => c.findText.indexOf(w) >= 0))) && (!fl.dc || U.branchOf(c.dc) === fl.dc));
   const s = fl.sort === 'customer' || !U.SORTS[fl.sort] ? null : fl.sort;
   if (s === 'account') rows.sort((a, b) => U.byRoute(a.account, b.account));
   else if (s === 'city') rows.sort((a, b) => U.byName(a.city, b.city) || U.byName(a.name, b.name));
@@ -132,7 +132,7 @@ function openCustomer(key) {
   const p = panel(add ? 'Add a customer' : c.name, (add ? '<label>Account number<input id="c-account" inputmode="numeric" placeholder="Leave blank if it has none"></label>' : '<div class="deliveries">Account ' + v('account') + (c.active === false ? ' · <b>Not on the Route Menu any more</b>' : '') + '<br>' + (ds.length ? ds.map(d => '<a href="route-sequence.html?route=' + encodeURIComponent(d.route) + '&day=' + d.day + '">' + e(dayName(d.day)) + ' route ' + e(d.route) + ', stop ' + d.stop + '</a>').join('<br>') : 'Not on any route day') + '</div>') +
     '<label>Name<input id="c-name" value="' + v('name') + '"' + dis + '></label>' +
     '<div class="two"><label>Chain<input id="c-chain" value="' + v('chain') + '"' + dis + '></label><label>Phone<input id="c-phone" value="' + v('phone') + '"' + dis + '></label></div>' +
-    '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + (c && U.dcOf(c.dc) && !U.DCS.some(d => d.code === U.dcOf(c.dc)) ? [{ code: U.dcOf(c.dc), name: 'DC ' + U.dcOf(c.dc) }] : []).concat(U.DCS).map(d => '<option value="' + d.code + '"' + ((c ? U.dcOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
+    '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + (c && U.branchOf(c.dc) && !U.DCS.some(d => d.code === U.branchOf(c.dc)) ? [{ code: U.branchOf(c.dc), name: 'DC ' + U.branchOf(c.dc) }] : []).concat(U.DCS).map(d => '<option value="' + d.code + '"' + ((c ? U.branchOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
     (c && (c.addressCheck || c.addressProposed) ? '<div class="deliveries">Address check: ' + e(c.addressCheck || '') + (c.addressProposed ? '<br>Proposed address: <b>' + e(c.addressProposed) + '</b>' : '') + (c.addressNote ? '<br>' + e(c.addressNote) : '') + (c.lat && c.lon ? '<br>GPS ' + e(gpsText(c)) + (c.gpsFrom ? ' (' + e(c.gpsFrom) + ')' : '') : '') + '</div>' : '') +
     '<label>Street<input id="c-address" value="' + v('address') + '"' + dis + '></label><label>Street, line 2<input id="c-address2" value="' + v('address2') + '"' + dis + '></label>' +
     '<div class="three"><label>City<input id="c-city" value="' + v('city') + '"' + dis + '></label><label>State<input id="c-state" value="' + v('state') + '" maxlength="4"' + dis + '></label><label>Zip<input id="c-zip" value="' + v('zip') + '"' + dis + '></label></div>' +

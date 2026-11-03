@@ -99,8 +99,11 @@ async function ph0(browser) {
     await m.goto(m.emailFor('master-customers.html'));
     await m.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await m.textContent('#udcl-nav a[aria-current="page"]'), 'Administration');
-    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['Status', 'DC ▲', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Group', 'Match status', 'Coordinate source']);
+    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['Status', 'DC ▲', 'Route', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Group', 'Match status', 'Coordinate source']);
     assert.match(await m.textContent('#card-stats'), /9\s*customers/);
+    // Joe 11/3: the upload sits in its own box, so the list keeps the screen.
+    assert.equal(await m.isHidden('#upload-box'), true);
+    await m.click('#upload-open');
     await m.setInputFiles('#i-addr', { name: 'Made Up Master List.csv', mimeType: 'text/csv', buffer: Buffer.from('DC,Chain,Account,Customer,Street,City,State,Zip,Latitude,Longitude,Phone,Group\n30,0,1196,ACORN CORNER MARKET,12 ELM ST,MAPLETON,PA,15401,39.9,-79.7,555-0199,Corner Stores\n') });
     // The Excel reader comes from the internet; a test machine stands in a small CSV reader for it.
     await m.evaluate(() => { if (!window.XLSX) window.XLSX = { read: (buf) => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: new TextDecoder().decode(buf) } }), utils: { sheet_to_json: (t) => t.trim().split('\n').map(l => l.split(',')) } }; });
@@ -109,13 +112,15 @@ async function ph0(browser) {
     assert.ok(await m.$('#i-msg .good'), await m.textContent('#i-msg'));
     const acorn = (await db().collection('udclCustomers').doc('fac_uniontown__1196').get()).data();
     assert.equal(acorn.phone, '555-0199'); assert.equal(acorn.address2, ''); assert.equal(acorn.group, 'Corner Stores'); assert.equal(acorn.lat, 39.9);
+    await m.click('#upload-close');
+    assert.equal(await m.isHidden('#upload-box'), true);
     assert.match(await m.textContent('#card-last'), /Last master list: Made Up Master List\.csv/);
     assert.match(await m.textContent('#rows tr[data-key="1196"]'), /39\.900000.*-79\.700000.*555-0199/);
     // Sorts: Customer name; a heading pressed twice goes the other way.
     await m.selectOption('#sort', 'name');
     assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '40121');
-    await m.click('#thead button[data-col="3"]'); await m.click('#thead button[data-col="3"]');
-    assert.equal(await m.getAttribute('#thead button[data-col="3"]', 'aria-sort'), 'descending');
+    await m.click('#thead button[data-col="4"]'); await m.click('#thead button[data-col="4"]');
+    assert.equal(await m.getAttribute('#thead button[data-col="4"]', 'aria-sort'), 'descending');
     assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '40463');
     // Inactive: it asks (the customer is on route 808 Monday), then it is off the route and out of Customers.
     m.once('dialog', d => d.accept());
