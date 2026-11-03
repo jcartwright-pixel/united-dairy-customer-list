@@ -436,8 +436,9 @@ test('Joe 11/2: a master list with a City heading and no second-line column leav
 
 test('Joe 11/2: an inactive customer shows nowhere else: not on the screens, the Sales app or the route days; only an administrator sets it', async () => {
   const { db } = await imported();
-  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'setActive', key: '5001', inactive: true }, now), /administrator/);
-  const out = await S.udclCall(db, boss, PLANT, { op: 'setActive', key: '5001', inactive: true }, now);
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'setStatus', keys: ['5001'], inactive: true }, now), /administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'setStatus', keys: ['5001'], inactive: true }, now);
+  assert.equal(out.customers['5001'].inactive, true); assert.equal(out.customers.length, undefined); assert.equal(out.routeDays.length, 2, 'only the route days it left come back');
   assert.deepEqual(out.removedFrom.sort(), ['route 900 Friday', 'route 900 Tuesday']);
   const v = await S.udclCall(db, boss, PLANT, { op: 'view' });
   assert.equal(v.customers['5001'], undefined); assert.equal(v.inactiveHidden, 1);
@@ -445,9 +446,27 @@ test('Joe 11/2: an inactive customer shows nowhere else: not on the screens, the
   assert.equal((await S.udclCall(db, boss, PLANT, { op: 'view', all: true })).customers['5001'].inactive, true, 'the Master Customer List has it');
   assert.equal((await S.udclCall(db, mgr, PLANT, { op: 'view', all: true })).customers['5001'], undefined, 'only for an administrator');
   assert.ok(!(await S.salesRows(db, PLANT)).rows.some(r => r.account === '5001'));
-  const back = await S.udclCall(db, boss, PLANT, { op: 'setActive', key: '5001', inactive: false }, now);
+  const back = await S.udclCall(db, boss, PLANT, { op: 'setStatus', keys: ['5001'], inactive: false }, now);
   assert.match(back.message, /active again/);
   assert.ok((await S.udclCall(db, boss, PLANT, { op: 'view' })).customers['5001']);
+});
+
+test('Joe 11/3: many customers change in one call, and only they come back', async () => {
+  const { db } = await imported();
+  const v = await S.udclCall(db, boss, PLANT, { op: 'view', all: true });
+  const keys = Object.keys(v.customers).slice(0, 3);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'setStatus', keys: keys.concat(['no-such-customer']), inactive: true }, now);
+  assert.equal(out.changed, 3); assert.deepEqual(Object.keys(out.customers).sort(), keys.slice().sort());
+  assert.equal(out.plant, undefined, 'not the whole list again');
+  assert.match(out.message, /^3 customers are inactive now/);
+  const again = await S.udclCall(db, boss, PLANT, { op: 'setStatus', keys, inactive: true }, now);
+  assert.equal(again.changed, 0); assert.match(again.message, /3 already were/);
+  await assert.rejects(S.udclCall(db, boss, PLANT, { op: 'setStatus', keys: ['no-such-customer'], inactive: true }, now), /not on the list/);
+});
+
+test('Joe 11/3: a name that starts with three periods is an inactive customer', () => {
+  assert.equal(U.inactiveName('...ACME MARKET'), true); assert.equal(U.inactiveName(' ... ACME'), true);
+  assert.equal(U.inactiveName('..ACME'), false); assert.equal(U.inactiveName('ACME...'), false); assert.equal(U.inactiveName(''), false);
 });
 
 test('Joe 11/2: the master list reads an Active / Status column', () => {

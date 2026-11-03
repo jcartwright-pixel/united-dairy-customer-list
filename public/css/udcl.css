@@ -173,9 +173,6 @@ body.udcl-page:has(#views [data-view="master"][aria-selected="true"]) #rows td {
 .master-table th button.sorter .arrow { font-size: .8em; }
 .master-table td { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
 .master-table tr.is-inactive td { color: #8a97a5; background: #f5f7f9; }
-.master-table select.status { font: inherit; font-weight: 700; padding: 2px 4px; border-radius: 6px; border: 1px solid #c4d0dc; width: 100%; }
-.master-table select.status.on { color: var(--runs-ink, #146c2e); background: var(--runs-bg, #e6f4ea); }
-.master-table select.status.off { color: #9a4b00; background: #fff4e5; }
 .udcl-page .eyebrow a { color: inherit; }
 .master-table th { white-space: normal; overflow: visible; }
 .master-table th button.sorter { white-space: normal; flex-wrap: wrap; }
@@ -193,7 +190,8 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .ml-title a:hover { text-decoration: underline; }
 .ml-title span { color: var(--muted); font-weight: 500; }
 .ml-bar input[type="search"], .ml-bar select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
-.ml-bar input[type="search"] { width: 280px; }
+.ml-bar input[type="search"] { flex: 0 1 260px; min-width: 150px; }
+.ml-bar select { min-width: 0; flex: 0 1 auto; }
 .ml-count { margin-left: auto; color: var(--muted); font-size: 15px; white-space: nowrap; }
 .ml-bar .print-menu > button, .ml-bar .ml-upload { min-height: 36px; }
 .ml-upload { min-height: 40px; padding: 0 16px; border: 1px solid var(--ud-blue); border-radius: 8px; background: var(--ud-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
@@ -216,3 +214,25 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .ml-modal .msg { padding: 8px 10px; border-radius: 8px; background: var(--band); font-weight: 600; }
 .ml-modal .msg.bad { background: var(--error-bg); color: var(--error-ink); }
 .ml-modal .msg.good { background: var(--runs-bg); color: var(--runs-ink); }
+/* Joe 11/3: double-click a status to switch it; pick many rows and switch them together. */
+.master-table .st { all: unset; box-sizing: border-box; display: block; width: 100%; text-align: center; padding: 3px 4px; border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer; user-select: none; border: 1px solid transparent; }
+.master-table .st.on { color: var(--runs-ink, #146c2e); background: var(--runs-bg, #e6f4ea); border-color: #a8dcb8; }
+.master-table .st.off { color: #9a4b00; background: #fff4e5; border-color: #f0c38e; }
+.master-table .st:focus-visible { outline: 2px solid var(--ud-blue); outline-offset: 1px; }
+.master-table th.pick, .master-table td.pick { width: 2.2%; padding: 0; text-align: center; }
+.master-table .box { display: inline-block; width: 15px; height: 15px; border: 2px solid #9fb2c4; border-radius: 4px; background: #fff; vertical-align: middle; }
+.master-table thead .box { border-color: #fff; background: transparent; }
+.master-table .box-btn { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 100%; height: 100%; }
+.master-table .box-btn.all .box, .master-table tr.picked .box { background: var(--ud-blue); border-color: var(--ud-blue); box-shadow: inset 0 0 0 2px #fff; }
+.master-table thead .box-btn.all .box { background: #fff; border-color: #fff; box-shadow: inset 0 0 0 3px var(--ud-blue); }
+.master-table thead .box-btn.some .box { background: linear-gradient(#fff, #fff) center / 9px 3px no-repeat; }
+.master-table tbody tr[data-key] { cursor: pointer; }
+.master-table tbody tr.picked td { background: #dcebfa !important; }
+.master-table tbody tr.saving .st { opacity: .55; }
+/* It floats over the bottom of the list, so nothing on the screen moves when rows are picked. */
+.ml-picked { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px; border-radius: 12px; background: #fff; border: 2px solid var(--ud-blue); box-shadow: 0 8px 24px rgba(10, 25, 45, .25); }
+.ml-picked b { color: var(--ud-blue-dark); white-space: nowrap; font-size: 16px; margin-right: 4px; }
+.ml-picked button { min-height: 36px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--ud-blue); background: var(--ud-blue); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ml-picked button#pick-on { background: #fff; color: var(--ud-blue); }
+.ml-picked button.quiet { background: none; border-color: transparent; color: var(--muted); }
+.ml-page .ml-table.has-picked { padding-bottom: 72px; }

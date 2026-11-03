@@ -378,6 +378,8 @@
   function isBranchCode(t) { return !!t && !NOT_BRANCH[t] && Number(t) <= 80; }
   /** The customer's branch (DC) code: the code itself, or Marietta for a route number; '' when blank. */
   function branchOf(v) { var t = dcOf(v); return !t || isBranchCode(t) ? t : ROUTE_BRANCH; }
+  // Joe 11/3: "any customer that has 3 periods in front of the name is an inactive customer." An upload makes it inactive.
+  function inactiveName(name) { return /^\s*\.{3}/.test(String(name || '')); }
   /** The route number the master file put in its DC column, '' when that column holds a branch or is blank. */
   function dcRoute(v) { var t = dcOf(v); return t && !isBranchCode(t) ? t : ''; }
   /** "30 Uniontown" for a branch, "51 DC 51" for a branch with no name here yet, '' for none or a route number. */
@@ -486,7 +488,7 @@
   }
 
   return { mapFits: mapFits, DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
-    CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, branchOf: branchOf, dcRoute: dcRoute, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
+    CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, branchOf: branchOf, dcRoute: dcRoute, dcName: dcName, inactiveName: inactiveName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, byName: byName, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,

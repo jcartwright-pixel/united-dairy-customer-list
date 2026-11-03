@@ -221,7 +221,8 @@ async function importMenu(db, plant, email, input, stamp) {
     const x = people[key], before = now.customers[key] || null;
     const a = (x.account && addresses[x.account]) || {}, g = gps[U.nameKey(x.name)] || {};
     const after = Object.assign({ plant, key, account: x.account, name: x.name, chain: x.chain, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null }, before || {});
-    after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true; delete after.inactive;
+    after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true;
+    if (U.inactiveName(x.name)) after.inactive = true; else delete after.inactive;
     if (!after.dc) after.dc = U.PLANT_DC[plant] || '';
     // What the upload has replaces what is here (counted when it changes something).
     const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && after[k] !== v) { after[k] = v; return 1; } return 0; };
@@ -422,6 +423,7 @@ async function importFullList(db, plant, email, input, stamp) {
     ['phone', 'contact', 'group'].forEach(k => { const v = U.text(r[k], U.LIMITS[k] || 60); if (v) after[k] = v; });
     // An Active / Status column, when the file has one, sets Active or Inactive; with none, what is here stays.
     if (r.inactive === true) after.inactive = true; else if (r.inactive === false) delete after.inactive;
+    if (U.inactiveName(x.name)) after.inactive = true;
     if (r.check !== undefined) {
       after.addressCheck = U.text(r.check, 60); after.addressNote = U.text(r.checkNote, 300); after.addressProposed = U.text(r.proposed, 200); after.gpsFrom = U.text(r.gpsFrom, 80);
     }
@@ -459,36 +461,54 @@ async function importFullList(db, plant, email, input, stamp) {
  * Joe 11/2, the Master Customer List: Active or Inactive. An inactive customer shows nowhere else (view, the Sales app, the
  * drivers' route book), so making one inactive also takes it off every route day it is on. Making it active again does not put
  * it back on a route: add it on Route Book (or the next Route Menu upload does).
+ * Joe 11/3: "extremely slow ... a lot of customers I need [to] select inactive". One call sets any number of customers (keys) and
+ * sends back only what changed (those customers and the route days they came off), not the whole list again.
  */
-async function setActive(db, plant, email, input, stamp) {
-  const key = U.text(input.key, 60), inactive = input.inactive === true;
-  if (!key) fail('BAD_REQUEST', 'Pick a customer.');
-  const ref = db.collection(CUSTOMERS).doc(U.customerId(plant, key));
-  const rds = inactive ? (await db.collection(ROUTE_DAYS).where('plant', '==', plant).get()).docs.filter(d => (d.data().stops || []).some(x => x.key === key)) : [];
-  return db.runTransaction(async tx => {
-    const snap = await tx.get(ref), before = snap.exists ? snap.data() : null;
-    if (!before) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
-    const rrefs = rds.map(d => db.collection(ROUTE_DAYS).doc(d.id)), fresh = rrefs.length ? await tx.getAll(...rrefs) : [];
+async function setStatus(db, plant, email, input, stamp) {
+  const keys = [...new Set((Array.isArray(input.keys) ? input.keys : []).map(k => U.text(k, 60)).filter(Boolean))].slice(0, 10000);
+  if (!keys.length) fail('BAD_REQUEST', 'Pick a customer.');
+  const inactive = input.inactive === true;
+  const refs = keys.map(k => db.collection(CUSTOMERS).doc(U.customerId(plant, k)));
+  const snaps = [];
+  for (let i = 0; i < refs.length; i += 300) snaps.push(...await db.getAll(...refs.slice(i, i + 300)));
+  const customers = {}, writes = [];
+  snaps.forEach((snap, i) => {
+    if (!snap.exists) return;
+    const before = snap.data();
+    if (!!before.inactive === inactive) { customers[before.key] = before; return; }
     const after = Object.assign({}, before, { updatedAt: stamp, updatedBy: email });
     if (inactive) after.inactive = true; else delete after.inactive;
-    tx.set(ref, after);
-    logEntry(db, tx, 'customer', plant, ref, before, after, email, stamp);
-    const off = [];
-    fresh.forEach((s, i) => {
-      if (!s.exists) return;
-      const b = s.data(), stops = (b.stops || []).filter(x => x.key !== key);
+    customers[after.key] = after;
+    writes.push([refs[i], before, after, 'customer']);
+  });
+  if (!Object.keys(customers).length) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
+  const routeDays = [], off = [];
+  const leaving = new Set(inactive ? writes.map(w => w[2].key) : []);
+  if (leaving.size) {
+    (await db.collection(ROUTE_DAYS).where('plant', '==', plant).get()).docs.forEach(d => {
+      const b = d.data(), stops = (b.stops || []).filter(x => !leaving.has(x.key));
       if (stops.length === (b.stops || []).length) return;
       const a = Object.assign({}, b, { stops, rev: (b.rev || 0) + 1, updatedAt: stamp, updatedBy: email });
-      tx.set(rrefs[i], a);
-      logEntry(db, tx, 'routeDay', plant, rrefs[i], b, a, email, stamp);
+      writes.push([db.collection(ROUTE_DAYS).doc(d.id), b, a, 'routeDay']);
+      routeDays.push(unpack(a));
       off.push('route ' + b.route + ' ' + (U.DAY_NAMES[b.day] || b.day));
     });
-    return { ok: true, customer: after, removedFrom: off, message: before.name + (inactive ? ' is inactive' + (off.length ? ' and was taken off ' + off.join(', ') : '') : ' is active again' + (before.inactive ? '. Add it to a route on Route Book' : '')) + '.' };
-  });
+  }
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([ref, before, after, what]) => { batch.set(ref, after); logEntry(db, batch, what, plant, ref, before, after, email, stamp); });
+    await batch.commit();
+  }
+  const changed = writes.filter(w => w[3] === 'customer'), one = keys.length === 1 ? customers[keys[0]] : null;
+  const message = one
+    ? one.name + (inactive ? ' is inactive' + (off.length ? ' and was taken off ' + off.join(', ') : '') : ' is active' + (changed.length ? ' again' : '') + (changed.length && changed[0][1].inactive ? '. Add it to a route on Route Book' : '')) + '.'
+    : changed.length + ' customer' + (changed.length === 1 ? ' is ' : 's are ') + (inactive ? 'inactive' : 'active') + ' now' + (Object.keys(customers).length - changed.length ? ' (' + (Object.keys(customers).length - changed.length) + ' already were)' : '') +
+      (off.length ? '. Taken off ' + off.length + ' route day' + (off.length === 1 ? '' : 's') + ': ' + off.join(', ') : '') + '.';
+  return { ok: true, customers, routeDays, removedFrom: off, changed: changed.length, message };
 }
 
-const OPS = { setActive, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { setActive: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+const OPS = { setStatus, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { setStatus: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
