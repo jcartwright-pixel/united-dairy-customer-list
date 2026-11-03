@@ -6,7 +6,7 @@ How to change this help: each part starts with `## Name`, then `id:` and `screen
 id: home
 screens: index.html
 
-The **United Dairy Customer List** is its own app. It keeps every customer, the routes and days they get a delivery, the run order and the truck load maps. Operations reads it: the Sales app's customers and the drivers' **Route Book** on their phones come from here. Sign in with the same United Dairy Google account as Operations.
+The **United Dairy Customer List** is its own app. It keeps every customer, the routes and days they get a delivery, the run order and the truck load maps. Operations reads it: the Sales app's customers and the drivers' **Route Book** on their phones come from here. Sign in with the same United Dairy Google account as Operations. Who can open it is ticked in the United Dairy Hub, People & Access (Customers & Routes); until it is ticked or unticked for someone, everyone Enabled can.
 
 1. Pick a screen from the tiles or the menu under the header. **Administration** shows only to administrators.
 2. Someone set up for more than one plant picks the plant in the header.

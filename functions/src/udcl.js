@@ -515,9 +515,13 @@ async function udclCall(db, who, plant, input, deps) {
   input = input || {};
   const op = String(input.op || 'view');
   const email = String(who && who.email || '').toLowerCase();
-  const person = await personOf(db, email);
+  const [person, access] = await Promise.all([personOf(db, email), db.collection('appAccess').doc(safeIdPart(email)).get()]);
   const r = rightsOf(person);
   if (!r.view) fail('NOT_ALLOWED', 'You are not on the Users list. Ask an administrator to add you.');
+  // Joe 11-3-26: the United Dairy Hub's People & Access ticks each app per person; once Customers & Routes is ticked or
+  // unticked for someone, that tick decides (until then, everyone Enabled, as before).
+  const ticks = access.exists ? access.data().apps : null;
+  if (Array.isArray(ticks) && ticks.indexOf('customers') < 0) fail('NOT_ALLOWED', 'You do not have Customers & Routes. Ask an administrator to tick it for you in the United Dairy Hub, People & Access.');
   // No plant named (the first time on this browser): the person's first plant that is running.
   if (!plant) plant = L.plantsFor(person).find(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE') || L.HOME_PLANT;
   if (L.plantsFor(person).indexOf(plant) < 0) fail('NOT_ALLOWED', 'You are not set up for ' + plantName(plant) + '.');
