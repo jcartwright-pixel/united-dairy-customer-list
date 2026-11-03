@@ -155,7 +155,7 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 /* Joe 11/2: the Directory's Group drop-down. */
 .udcl-page select.grp, .udcl-page input.grp-new { width: 100%; min-height: 32px; font: inherit; padding: 2px 6px; border: 1px solid #c4d0dc; border-radius: 6px; background: #fff; }
 
-/* Joe 11/2 facelift: the Master Customer List upload card, the footer, and calmer action buttons. */
+/* Joe 11/2 facelift: the footer and calmer action buttons. */
 .udcl-page th.dayroute, .udcl-page td.dayroute { min-width: 3.2em; padding-left: 2px; padding-right: 2px; }
 .udcl-page .head .actions.in-head { gap: 8px; }
 .udcl-page .head .actions.in-head > button { min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
@@ -163,25 +163,7 @@ body.udcl-mini .lm-right th:nth-child(4), body.udcl-mini .lm-right td:nth-child(
 .udcl-page .head .actions.in-head > button:hover { filter: brightness(.96); }
 .udcl-foot { flex-wrap: wrap; gap: 4px 24px; font-size: 14px; }
 .udcl-foot b { color: var(--ink); }
-.udcl-master { padding: 0 16px 8px; }
-.ml-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 8px; }
-.ml-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px; border: 2px dashed #c4d0dc; border-radius: 10px; background: var(--band, #eef3f8); }
-.ml-pick b { color: var(--ud-blue-dark); font-size: 17px; }
-.ml-pick input[type="file"] { font: inherit; flex: 1; min-width: 240px; }
-.ml-pick button { min-height: 40px; padding: 0 22px; border-radius: 8px; border: 0; background: var(--ud-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-.ml-pick button:disabled { opacity: .6; cursor: wait; }
-.ml-stats { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px; color: var(--muted); }
-.ml-stat b { color: var(--ud-blue-dark); font-size: 18px; font-variant-numeric: tabular-nums; }
-.ml-stat.warn b { color: #9a4b00; }
-.ml-card details { font-size: 14px; color: var(--muted); }
-.ml-card summary { cursor: pointer; color: var(--ud-blue); font-weight: 700; }
-.ml-card ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 3px; }
-.ml-card .msg { padding: 8px 10px; border-radius: 8px; background: var(--band); }
-.ml-card .msg.bad { background: var(--error-bg); color: var(--error-ink); }
-.ml-card .msg.good { background: var(--runs-bg); color: var(--runs-ink); }
-.ml-last:empty { display: none; }
 body.udcl-page:has(#views [data-view="master"][aria-selected="true"]) #rows td { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
-.ml-last { color: var(--muted); font-size: 14px; }
 /* Joe 11/2: long lists draw 300 lines at a time. */
 .udcl-page tr.more td { text-align: center; color: var(--muted); padding: 10px; }
 .udcl-page tr.more button { min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
@@ -203,3 +185,34 @@ body.waiting #screen > :not(.topbar):not(.udcl-nav):not(.notice):not(.update-rea
 .screen-loading { display: none; }
 body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 0; top: 45%; text-align: center; font-size: 20px; font-weight: 700; color: var(--muted); }
 .master-table { table-layout: fixed; }
+/* Joe 11/3: the Master Customer List gives the list the room. One slim bar on top, the list, one line of totals at the bottom,
+   and the upload in its own box. */
+.ml-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; flex-wrap: wrap; }
+.ml-title { margin: 0 8px 0 0; font-size: 20px; color: var(--ud-blue-dark); white-space: nowrap; }
+.ml-title a { color: var(--ud-blue); font-weight: 600; text-decoration: none; }
+.ml-title a:hover { text-decoration: underline; }
+.ml-title span { color: var(--muted); font-weight: 500; }
+.ml-bar input[type="search"], .ml-bar select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
+.ml-bar input[type="search"] { width: 280px; }
+.ml-count { margin-left: auto; color: var(--muted); font-size: 15px; white-space: nowrap; }
+.ml-bar .print-menu > button, .ml-bar .ml-upload { min-height: 36px; }
+.ml-upload { min-height: 40px; padding: 0 16px; border: 1px solid var(--ud-blue); border-radius: 8px; background: var(--ud-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ml-upload:disabled { opacity: .6; cursor: wait; }
+.ml-page .ml-table { margin: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.ml-page .view:not([hidden]) { padding-bottom: 0; }
+.ml-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; padding: 5px 16px 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.ml-foot b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.ml-foot .ml-stat.warn b { color: #9a4b00; }
+.ml-foot span:empty { display: none; }
+.ml-foot #card-stats, .ml-foot #card-last { display: inline-flex; flex-wrap: wrap; gap: 2px 14px; }
+.ml-modal footer button:disabled { opacity: .6; cursor: wait; }
+.ml-foot #save-msg { color: var(--runs-ink); }
+.ml-modal .box { width: min(640px, 100%); }
+.ml-modal-body { display: grid; gap: 12px; padding: 16px 18px; overflow: auto; }
+.ml-modal .ml-file input[type="file"] { font: inherit; font-weight: 600; padding: 10px; border: 2px dashed #c4d0dc; border-radius: 10px; background: var(--band); }
+.ml-modal details { font-size: 14px; color: var(--muted); font-weight: 500; }
+.ml-modal summary { cursor: pointer; color: var(--ud-blue); font-weight: 700; }
+.ml-modal ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 3px; }
+.ml-modal .msg { padding: 8px 10px; border-radius: 8px; background: var(--band); font-weight: 600; }
+.ml-modal .msg.bad { background: var(--error-bg); color: var(--error-ink); }
+.ml-modal .msg.good { background: var(--runs-bg); color: var(--runs-ink); }

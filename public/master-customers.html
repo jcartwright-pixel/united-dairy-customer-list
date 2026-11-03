@@ -12,9 +12,11 @@
   <link rel="stylesheet" href="css/udcl.css">
   <script src="js/udcl-rules.js"></script>
 </head>
-<!-- Joe 11/2: "I want to customer address list put into the administration tab ... basically a master customer list. It will show
-     all of them", Active or Inactive first, a Sort by box (location, then A to Z) and a sort on every heading. Administrators only. -->
-<body class="fill udcl-page" data-help="master-customers">
+<!-- Joe 11/2: "basically a master customer list. It will show all of them", Active or Inactive first, a Sort by box and a sort on
+     every heading. Administrators only.
+     Joe 11/3: "get rid of the garbage ... I have more usable room for the list." One slim bar on top (title, the boxes, Upload,
+     Print), the list fills the rest, the totals sit in one line at the bottom, and the upload opens in its own box. -->
+<body class="fill udcl-page ml-page" data-help="master-customers">
   <div class="signin" id="signin" hidden>
     <h1>Master Customer List</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -27,44 +29,47 @@
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
     </div>
-    <div class="head">
-      <div class="title"><span class="eyebrow"><a href="administration.html">Administration</a> · <span id="plant-name"></span></span><h1>Master Customer List</h1></div>
-      <div class="actions in-head"><span id="udcl-print-menu"></span></div>
-    </div>
     <div class="notice error" id="error" hidden></div>
     <p class="udcl-help" id="not-admin" hidden>Only an administrator can use the Master Customer List.</p>
+
     <div class="view" id="master-view" hidden>
-      <div class="udcl-master">
-        <div class="ml-card">
-          <div class="ml-pick"><b>Upload the master address list</b><input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv" aria-label="Master address list file"><button type="button" class="primary" id="i-addr-go">Upload</button></div>
-          <div id="i-msg"></div>
-          <div class="ml-stats" id="card-stats"></div>
-          <div class="ml-last" id="card-last"></div>
-          <details><summary>What an upload changes</summary><ul>
-            <li>The file needs <b>DC, Chain, Account, Customer</b> and the street, city, state and ZIP. <b>Status</b> (Active or Inactive), <b>Latitude, Longitude, Phone, Contact, Group, Match status, Matched address</b> and <b>Coordinate source</b> are read when they are there.</li>
-            <li><b>Changes</b> each customer's name, chain, distribution center and address, and the GPS, phone, contact, group and status the file has. <b>Adds</b> a customer the list does not have yet (with no route).</li>
-            <li><b>Keeps</b> routes, run and load order, notes, keys, anything the file leaves blank, and a checked ship-to address. A PO box, mailbox or c/o never replaces a street.</li>
-            <li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li>
-            <li>A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.</li>
-          </ul></details>
-        </div>
+      <div class="ml-bar">
+        <h1 class="ml-title"><a href="administration.html">Administration</a><span aria-hidden="true"> › </span>Master Customer List</h1>
+        <input type="search" id="q" placeholder="Find: name, account, city, ZIP, phone" aria-label="Find">
+        <select id="sort" aria-label="Sort by">
+          <option value="location">Sort: Location, then A to Z</option><option value="name">Sort: Customer name, A to Z</option><option value="city">Sort: City, then A to Z</option><option value="status">Sort: Inactive first</option><option value="">Sort: The heading you pressed</option>
+        </select>
+        <select id="dcpick" aria-label="Location"><option value="">All locations</option></select>
+        <select id="status" aria-label="Status"><option value="">Active and inactive</option><option>Active</option><option>Inactive</option></select>
+        <span class="ml-count" id="count"></span>
+        <button type="button" class="ml-upload" id="upload-open">Upload master list</button>
+        <span id="udcl-print-menu"></span>
       </div>
-      <div class="udcl-bar" id="bar">
-        <div class="field"><label for="q">Find</label><input type="search" id="q" placeholder="Name, account, city, ZIP, phone"></div>
-        <div class="field"><label for="sort">Sort by</label><select id="sort">
-          <option value="location">Location, then A to Z</option><option value="name">Customer name, A to Z</option><option value="city">City, then A to Z</option><option value="status">Inactive first</option><option value="">The heading you pressed</option>
-        </select></div>
-        <div class="field"><label for="dcpick">Location</label><select id="dcpick"><option value="">All locations</option></select></div>
-        <div class="field"><label for="status">Status</label><select id="status"><option value="">Active and inactive</option><option>Active</option><option>Inactive</option></select></div>
-        <span class="count" id="count"></span>
-      </div>
-      <div class="scroll-list" id="table-wrap">
+      <div class="scroll-list ml-table" id="table-wrap">
         <table class="master-table">
           <thead id="thead"></thead>
           <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
         </table>
       </div>
-      <div class="footer udcl-foot"><span id="save-msg"></span></div>
+      <div class="ml-foot"><span id="card-stats"></span><span id="card-last"></span><span id="save-msg"></span></div>
+    </div>
+  </div>
+
+  <div class="udcl-modal ml-modal" id="upload-box" hidden role="dialog" aria-modal="true" aria-labelledby="upload-title">
+    <div class="box">
+      <header><h2 id="upload-title">Upload the master address list</h2><button type="button" id="upload-close">Close</button></header>
+      <div class="ml-modal-body">
+        <label class="ml-file">Pick the file (.xlsx, .csv or .txt)<input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv"></label>
+        <div id="i-msg"></div>
+        <details><summary>What an upload changes</summary><ul>
+          <li>The file needs <b>DC, Chain, Account, Customer</b> and the street, city, state and ZIP. <b>Status</b> (Active or Inactive), <b>Latitude, Longitude, Phone, Contact, Group, Match status, Matched address</b> and <b>Coordinate source</b> are read when they are there.</li>
+          <li><b>Changes</b> each customer's name, chain, distribution center and address, and the GPS, phone, contact, group and status the file has. <b>Adds</b> a customer the list does not have yet (with no route).</li>
+          <li><b>Keeps</b> routes, run and load order, notes, keys, anything the file leaves blank, and a checked ship-to address. A PO box, mailbox or c/o never replaces a street.</li>
+          <li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li>
+          <li>A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.</li>
+        </ul></details>
+      </div>
+      <footer><span></span><button type="button" class="primary" id="i-addr-go">Upload</button></footer>
     </div>
   </div>
 

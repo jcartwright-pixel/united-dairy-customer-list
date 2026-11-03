@@ -369,8 +369,19 @@
   /** The DC code when it is one of ours ('030' and 30 are '30'), else ''. */
   // Joe 11/2: the full company list has every distribution center, also ones with no name here yet (61, 71, 142 ...): keep the number.
   function dcOf(v) { var t = numText(v, 6).replace(/^0+(?=\d)/, ''); return /^\d{1,4}$/.test(t) ? t : ''; }
-  /** "30 Uniontown" for a DC code, '' when it has none. */
-  function dcName(v) { var t = dcOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : t ? t + ' DC ' + t : ''; }
+  // Joe 11/3: the master file's DC column also holds route numbers. "103, 107, 112 are all just route numbers. They are not branches",
+  // "anything above 80 is not a branch", and 0, 8, 11, 12 and 14 are not either. "Look at the chain and customer number to determine
+  // the DC": every one of those customers is chain 0 with an account from one 4 to 5 digit series, the Marietta books (DC 9 has no
+  // other customers in the file), so their branch is Marietta. The number stays as the file has it (an upload matches on it) and
+  // shows under Route.
+  var NOT_BRANCH = { '0': 1, '8': 1, '11': 1, '12': 1, '14': 1 }, ROUTE_BRANCH = '9';
+  function isBranchCode(t) { return !!t && !NOT_BRANCH[t] && Number(t) <= 80; }
+  /** The customer's branch (DC) code: the code itself, or Marietta for a route number; '' when blank. */
+  function branchOf(v) { var t = dcOf(v); return !t || isBranchCode(t) ? t : ROUTE_BRANCH; }
+  /** The route number the master file put in its DC column, '' when that column holds a branch or is blank. */
+  function dcRoute(v) { var t = dcOf(v); return t && !isBranchCode(t) ? t : ''; }
+  /** "30 Uniontown" for a branch, "51 DC 51" for a branch with no name here yet, '' for none or a route number. */
+  function dcName(v) { var t = branchOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : t ? t + ' DC ' + t : ''; }
   // The parts of a ship-to address (a checked one stays through an upload: importMenu).
   var ADDRESS_FIELDS = ['address', 'address2', 'city', 'state', 'zip', 'lat', 'lon'];
   var CUSTOMER_FIELDS = ['name', 'chain', 'group', 'dc', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
@@ -475,7 +486,7 @@
   }
 
   return { mapFits: mapFits, DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
-    CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
+    CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, branchOf: branchOf, dcRoute: dcRoute, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, byName: byName, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
