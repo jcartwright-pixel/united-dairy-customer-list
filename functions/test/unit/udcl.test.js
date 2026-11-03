@@ -167,7 +167,8 @@ test('distribution center codes: written the one way; a DC with no name here kee
   assert.equal(U.dcName(''), '');
   // Joe 11/3: route numbers in the DC column (above 80, and 0, 8, 11, 12, 14) are not branches; they are Marietta's customers.
   assert.equal(U.branchOf('103'), '9'); assert.equal(U.dcRoute('103'), '103'); assert.equal(U.dcName('112'), '9 Marietta');
-  ['0', '8', '12', '14', '234', '605', '815'].forEach(v => { assert.equal(U.branchOf(v), '9', v); assert.equal(U.dcRoute(v), v, v); });
+  ['0', '8', '12', '14', '234', '605'].forEach(v => { assert.equal(U.branchOf(v), '9', v); assert.equal(U.dcRoute(v), v, v); });
+  assert.equal(U.branchOf('815'), '30', 'route 815 is on the Uniontown Route Menu'); assert.equal(U.dcRoute('815'), '815');
   assert.equal(U.branchOf(''), '');
   ['1', '6', '7', '9', '30', '50', '61', '80'].forEach(v => { assert.equal(U.branchOf(v), v, v); assert.equal(U.dcRoute(v), '', v); });
   assert.equal(U.dcRoute('30'), ''); assert.equal(U.dcRoute(''), '');
@@ -467,6 +468,37 @@ test('Joe 11/3: many customers change in one call, and only they come back', asy
 test('Joe 11/3: a name that starts with three periods is an inactive customer', () => {
   assert.equal(U.inactiveName('...ACME MARKET'), true); assert.equal(U.inactiveName(' ... ACME'), true);
   assert.equal(U.inactiveName('..ACME'), false); assert.equal(U.inactiveName('ACME...'), false); assert.equal(U.inactiveName(''), false);
+});
+
+test('Joe 11/3: once, a Uniontown customer on no route goes inactive, and a route customer filed under another DC is Uniontown\'s', async () => {
+  const { db } = await imported();
+  // The master list before 11/3: ACME (on route 900) under route number 815, BEST FOODS under DC 1, two Uniontown customers on no route, one of Lancaster's.
+  await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: [
+    { dc: '815', chain: '0', account: '5001', name: 'ACME MARKET', address: '1 MAIN ST', city: 'TOWN', state: 'PA', zip: '15401', lat: 40.1, lon: -79.9, phone: '555-0101' },
+    { dc: '1', chain: '415', account: '5002', name: 'BEST FOODS #2', address: '2 MAIN ST', city: 'TOWN', state: 'PA', zip: '15401' },
+    { dc: '30', chain: '0', account: '7001', name: 'OLD MILL STORE', address: '7 MILL RD', city: 'TOWN', state: 'PA', zip: '15401' },
+    { dc: '30', chain: '0', account: '7002', name: 'RIVER CAFE', address: '8 RIVER RD', city: 'TOWN', state: 'PA', zip: '15401' },
+    { dc: '6', chain: '0', account: '7003', name: 'LANCASTER DELI', address: '9 HIGH ST', city: 'LANCASTER', state: 'OH', zip: '43130' }] }, now);
+  let v = await S.udclCall(db, boss, PLANT, { op: 'view', all: true });
+  assert.ok(!v.customers['D815-5001'], 'a new upload already files a route customer under Uniontown');
+  assert.equal(v.customers['5001'].phone, '555-0101'); assert.equal(v.customers['5001'].dc, '30');
+  // Live data from before that: copies under another DC (made by hand here, as the earlier upload made them).
+  const copy = Object.assign({}, v.customers['5002'], { key: 'D1-5002', dc: '1', lat: 40.2, lon: -79.8, phone: '555-0102' });
+  await db.collection('udclCustomers').doc(U.customerId(PLANT, 'D1-5002')).set(copy);
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'applyRouteRule' }, now), /administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'applyRouteRule' }, now);
+  v = await S.udclCall(db, boss, PLANT, { op: 'view', all: true });
+  assert.equal(v.customers['D1-5002'], undefined, 'the copy went into the route customer');
+  assert.equal(v.customers['5002'].phone, '555-0102'); assert.equal(v.customers['5002'].lat, 40.2); assert.equal(v.customers['5002'].dc, '30');
+  assert.equal(v.customers['7001'].inactive, true); assert.equal(v.customers['7002'].inactive, true);
+  assert.equal(v.customers['D6-7003'].inactive, undefined, 'another branch is left alone');
+  assert.equal(v.customers['5001'].inactive, undefined); assert.equal(v.customers['5004'].inactive, undefined, 'route customers stay active');
+  assert.equal(out.merged.length, 1); assert.match(out.message, /inactive now; 1 on a Uniontown route/);
+  assert.equal(v.routeRule.merged, 1);
+  // Once only: switching one back stays switched.
+  await S.udclCall(db, boss, PLANT, { op: 'setStatus', keys: ['7001'], inactive: false }, now);
+  assert.equal((await S.udclCall(db, boss, PLANT, { op: 'applyRouteRule' }, now)).already, true);
+  assert.equal((await S.udclCall(db, boss, PLANT, { op: 'view', all: true })).customers['7001'].inactive, undefined);
 });
 
 test('Joe 11/2: the master list reads an Active / Status column', () => {

@@ -244,7 +244,15 @@ printMenu($('udcl-print-menu'), () => !data ? [] : [{ label: 'This list, as show
 
 requireSignIn(async () => {
   try {
-    setData(await readList({ all: true })); showError('');
+    let d = await readList({ all: true }), ruled = '';
+    // Joe 11/3, once: Uniontown customers on no route go inactive, and route customers the master list had under another DC become
+    // Uniontown's (applyRouteRule). Done before the list is drawn, so the screen shows once, already right.
+    if (d.canImport && !d.routeRule && (d.routeDays || []).length && d.plant === 'fac_uniontown') {
+      ruled = (await saveStep('applyRouteRule', {})).message;
+      d = await readList({ all: true });
+    }
+    setData(d); showError('');
+    if (ruled) $('save-msg').textContent = ruled;
     // Joe 11/3: a name that starts with "..." is an inactive customer. Any still active from before that rule are switched now.
     const dotted = Object.values(data.customers).filter(c => !c.inactive && U.inactiveName(c.name)).map(c => c.key);
     if (dotted.length) await setStatus(dotted, true, true);

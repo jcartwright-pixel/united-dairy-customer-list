@@ -70,7 +70,7 @@ async function view(db, plant, person, opts) {
   if (!all) Object.keys(d.customers).forEach(k => { if (d.customers[k].inactive) { delete d.customers[k]; inactive++; } });
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
     customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
-    master: d.meta && d.meta.master ? d.meta.master : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
+    master: d.meta && d.meta.master ? d.meta.master : null, routeRule: d.meta && d.meta.routeRule ? d.meta.routeRule : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
     inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList };
 }
 
@@ -392,6 +392,10 @@ async function importFullList(db, plant, email, input, stamp) {
   // Give every row its key.
   const clean = all.map(r => ({ r, dc: U.dcOf(r && r.dc) || dc, account: U.numText(r && r.account, U.LIMITS.account), name: U.text(r && r.name, U.LIMITS.name), chain: U.numText(r && r.chain, U.LIMITS.chain) }))
     .filter(x => x.account && x.name);
+  // Joe 11/3: a customer on one of this plant's routes is this plant's customer, whatever DC the master file gives it (the file
+  // puts some under a route number, 815, or another branch). Its row goes onto the customer the route has, and keeps this DC.
+  const ours = (x) => { const k = U.custKey(x.account, x.name), c = now.customers[k]; return x.dc !== dc && onRoute.has(k) && c && U.nameKey(c.name) === U.nameKey(x.name); };
+  clean.forEach(x => { if (ours(x)) x.dc = dc; });
   const base = (x) => (x.dc === dc ? '' : 'D' + x.dc + '-') + U.custKey(x.account, x.name);
   const byBase = {};
   clean.forEach(x => { x.base = base(x); (byBase[x.base] = byBase[x.base] || []).push(x); });
@@ -507,8 +511,59 @@ async function setStatus(db, plant, email, input, stamp) {
   return { ok: true, customers, routeDays, removedFrom: off, changed: changed.length, message };
 }
 
-const OPS = { setStatus, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { setStatus: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+/**
+ * Joe 11/3, once per plant, from the Uniontown Route Menu: "if it doesn't have a route assigned to it at all, let's make it inactive
+ * at least for the Uniontown location", and "if you find a customer is not associated to Uniontown, but it's in that customer list
+ * tab, then make sure you mark it". So:
+ *  1. A master-list copy of a customer on this plant's routes, filed under another DC (D815-56 beside 56), goes into the route's
+ *     customer: its address, GPS, phone and checks fill in what the route's customer lacks, the route's customer keeps this DC and
+ *     is active, and the copy goes.
+ *  2. Every customer of this plant's DC that is on no route day becomes inactive.
+ * It runs once (private/udcl_<plant>.routeRule); after that each customer is switched on the Master Customer List as usual.
+ */
+async function applyRouteRule(db, plant, email, input, stamp) {
+  const dc = U.PLANT_DC[plant] || '';
+  if (!dc) fail('BAD_REQUEST', 'This plant has no distribution center number yet.');
+  const now = await readPlant(db, plant);
+  if (now.meta && now.meta.routeRule) return { ok: true, already: true, message: 'Already done on ' + now.meta.routeRule.at.slice(0, 10) + '.' };
+  if (!now.routeDays.length) fail('BAD_REQUEST', 'No Route Menu has been uploaded for this plant yet.');
+  const onRoute = new Set();
+  now.routeDays.forEach(rd => (rd.stops || []).forEach(x => onRoute.add(x.key)));
+  const writes = [], merged = [], gone = new Set();
+  const FILL = ['address', 'address2', 'city', 'state', 'zip', 'lat', 'lon', 'phone', 'contact', 'group', 'addressCheck', 'addressNote', 'addressProposed', 'gpsFrom'];
+  Object.values(now.customers).forEach(c => {
+    const m = /^D(\d+)-(.+?)(-C[0-9]+(-\d+)?)?$/.exec(c.key || ''), k = m && m[2], r = k && now.customers[k];
+    if (!r || !onRoute.has(k) || U.nameKey(r.name) !== U.nameKey(c.name)) return;
+    const before = Object.assign({}, r), after = Object.assign({}, r, { dc, active: true, onCompanyList: true, updatedAt: stamp, updatedBy: email });
+    delete after.inactive;
+    FILL.forEach(f => { if ((after[f] === '' || after[f] === null || after[f] === undefined) && c[f] !== '' && c[f] !== null && c[f] !== undefined) after[f] = c[f]; });
+    now.customers[k] = after; gone.add(c.key);
+    writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, k)), before, after]);
+    writes.push(['delete', db.collection(CUSTOMERS).doc(U.customerId(plant, c.key)), c, null]);
+    merged.push(r.name + ' (was also under DC ' + m[1] + ')');
+  });
+  let off = 0;
+  Object.values(now.customers).forEach(c => {
+    if (gone.has(c.key) || c.inactive || onRoute.has(c.key) || U.branchOf(c.dc) !== dc) return;
+    const after = Object.assign({}, c, { inactive: true, updatedAt: stamp, updatedBy: email });
+    writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, c.key)), c, after]);
+    off++;
+  });
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([what, ref, before, after]) => {
+      if (what === 'delete') batch.delete(ref); else batch.set(ref, after);
+      logEntry(db, batch, 'customer', plant, ref, before, after, email, stamp);
+    });
+    await batch.commit();
+  }
+  await db.collection('private').doc('udcl_' + plant).set({ routeRule: { at: stamp, by: email, inactive: off, merged: merged.length } }, { merge: true });
+  return { ok: true, inactive: off, merged, message: off + ' ' + plantName(plant) + ' customers on no route are inactive now' +
+    (merged.length ? '; ' + merged.length + ' on a ' + plantName(plant) + ' route that the master list had under another DC are ' + plantName(plant) + ' customers now' : '') + '.' };
+}
+
+const OPS = { setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
