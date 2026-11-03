@@ -17,13 +17,13 @@ The **United Dairy Customer List** is its own app. It keeps every customer, the 
 
 > When a new version of the Customer List is out, a yellow **Update ready** line shows under the header on every open screen (and in the installed app). Press `Refresh` to get it. The Load Map Kiosk refreshes by itself.
 
-## Customers
-id: customers
+## Routes
+id: routes
 screens: customers.html
 
 The **United Dairy Customer List** (UDCL): the one list of every customer, the routes and days they get a delivery, and in what order. The Sales app and the drivers' route book read it from here. Each plant keeps its own list (Uniontown first).
 
-1. Pick a tab: `By Customer` (one line per customer: chain, group, account, customer, distribution center, address, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, group, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). An **inactive** customer (set on **Administration**, **Master Customer List**) is not shown here, nor anywhere else.
+1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). An **inactive** customer (set on **Customers**) is not shown here, nor anywhere else. A customer's group is set on **Customers**.
 2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory`), **DC** and **Chain**. **Sort by** changes the order.
 3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
 4. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
@@ -32,7 +32,6 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 - `+ Add Customer` (Administrators and Managers) adds a customer by account number and name. Then add it to a route day on **Route Book**.
 - `Upload Route Menu` (Administrators): pick the **Route Menu** workbook, and the **Route Book** too if you have it, then `Upload`. The Route Menu's **Customer By Route** tab decides every customer, route, day and load sequence; its **Address List** and **GPS Address** tabs fill in addresses. An address that was checked (looked up by the store's name and town, so it is where the truck goes) stays through the upload, and the upload never puts a PO box, mailbox, RR box or "c/o" address in place of a street address. The Route Book's run order, start times, keys and instructions replace what is here, and so does its truck drawing where the numbers still match. `Bring over the Sales app list` copies the list already uploaded for the Sales app instead.
-- **Group** (on `By Customer` and `Directory`, Administrators and Managers): pick the customer's group from the drop-down, or pick `+ Add a group…`, type the new name and press Enter. The Sales app groups its customers by this. Use it when the chain number puts two different stores together.
 - **DC** box: show one distribution center only. The full customer list brings in every distribution center.
 - On `Directory`, **Address check** says how the address was checked; point at it for the notes and any proposed address. A customer's card shows the same.
 - `Show 300 more` and `Show all` at the end of a long list: the list shows 300 customers at a time so the screen stays quick. **Find** and the boxes still search all of them.
@@ -49,23 +48,24 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 !> Do not import an old Route Menu. A route day that is not in the workbook is taken off, and its customers move to not active (shown crossed out).
 
-## Master Customer List
+## Customers
 id: master-customers
 screens: master-customers.html
 
-On **Administration** (administrators only): the master customer list, every customer of every location, Active or Inactive, with the address, GPS and phone under the master file's own headings. The master address list is uploaded here, and the addresses, GPS and phones everywhere in the Customer List come from it. An **Inactive** customer shows nowhere else: not on Customers, Route Book, the Truck Load Map, the Sales app or the drivers' route book.
+The **Customers** tab (administrators only): the master customer list, every customer of every location, Active or Inactive, with the address, GPS and phone under the master file's own headings. The master address list is uploaded here, and the addresses, GPS and phones everywhere in the Customer List come from it. An **Inactive** customer shows nowhere else: not on Routes, Route Book, the Truck Load Map, the Sales app or the drivers' route book.
 
-1. Open `Administration`, then `Master Customer List`.
+1. Open `Customers` in the menu.
 2. To upload: press `Upload master list` (top right), pick the file (.xlsx, .csv or .txt) and press `Upload`. Wait for the green line; five thousand customers take about a minute. `Close` (or Esc) puts the list back.
 3. **Sort by**: `Location, then A to Z` (the first choice), `Customer name, A to Z`, `City, then A to Z` or `Inactive first`. Or press any heading to sort by it; press it again for the other way. The arrow shows which heading sorts the list.
 4. Narrow the list with **Find** (name, account, city, ZIP, phone, route), the location box and the status box, all in the one bar above the list.
 5. To make one customer inactive, double-click its **Status** (`Active` turns to `Inactive`). Double-click again to make it active.
-6. To change many at once: click a line to pick it (click again to let go), Shift-click another line to pick every line between, or hold the mouse down and drag down the list. The box at the top of the first column picks every customer the boxes show (use **Find** for a chain or a name first). Then press `Make inactive` or `Make active` on the bar at the bottom. `Clear` (or Esc) lets go of the picked lines.
+6. To change many at once: click a line to pick it (click again to let go), Shift-click another line to pick every line between, or hold the mouse down and drag down the list. The box at the top of the first column picks every customer the boxes show (use **Find** for a chain or a name first). Then press `Make inactive` or `Make active` on the bar at the bottom, or pick a group in `Set group…` to put them all in it. `Clear` (or Esc) lets go of the picked lines.
+7. **Group** (before **Chain**): click a customer's group (or the empty spot) and pick its group from the list; it saves at once. The Sales app groups its customers by this. The groups themselves are added on **Administration**, **Groups**.
 
 ### Buttons
 
 - **Status**: double-click to switch between `Active` and `Inactive`. It saves at once. A customer still on a route asks first: making it inactive takes it off its route days.
-- `Make inactive`, `Make active` and `Clear`: on the bar that shows when lines are picked.
+- `Make inactive`, `Make active`, `Set group…` and `Clear`: on the bar that shows when lines are picked.
 - A customer whose name starts with three periods (`...`) is inactive: an upload makes it inactive, and the screen switches any still active.
 - `Upload`: reads the master file. It needs **DC**, **Chain**, **Account** and **Customer** (or **Name**) headings and the street, city, state and ZIP. **Status** (Active or Inactive), **Latitude**, **Longitude**, **Phone**, **Contact**, **Group**, **Match status**, **Matched address** and **Coordinate source** are read when they are there. A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.
 - `What an upload changes` (in the upload box) lists what an upload changes, keeps and removes.
@@ -152,9 +152,9 @@ screens: administration.html
 For administrators only (it is not in the menu for anyone else).
 
 1. `Load Map Kiosk` opens the plant floor kiosk view, to see how it looks. Nothing can be changed from it.
-2. `Master Customer List` opens every customer of every location, Active or Inactive, where the master address list is uploaded (see its own part of this guide).
-3. `Upload the Route Menu` goes to **Customers**, where `Upload Route Menu` uploads the workbooks.
-4. Under the tiles: when the last upload was, by whom and from which file.
+2. `Upload the Route Menu` goes to **Routes**, where `Upload Route Menu` uploads the workbooks.
+3. **Groups**: type a new group's name and press `Add group`. `Rename` changes a group's name on every customer in it; `Remove` takes it off every customer in it (it asks first). Put customers in a group on **Customers**.
+4. At the bottom: when the last Route Menu upload was, by whom and from which file.
 
 !> Do not upload an old Route Menu. A new upload overrules the changes made here.
 

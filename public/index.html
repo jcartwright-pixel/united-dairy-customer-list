@@ -49,7 +49,7 @@ requireSignIn(async () => {
     const d = await readList();
     document.getElementById('plant-name').textContent = d.plantName || '';
     const n = Object.keys(d.customers || {}).length, r = (d.routeDays || []).length;
-    document.getElementById('imported').textContent = n ? n + ' customers on ' + r + ' route days' + (d.imported && d.imported.at ? ' · last import ' + shortDate(d.imported.at) + ' by ' + (d.imported.by || '') : '') + '.' : 'The list is empty. An administrator imports the Route Menu on Customers.';
+    document.getElementById('imported').textContent = n ? n + ' customers on ' + r + ' route days' + (d.imported && d.imported.at ? ' · last import ' + shortDate(d.imported.at) + ' by ' + (d.imported.by || '') : '') + '.' : 'The list is empty. An administrator imports the Route Menu on Routes.';
   } catch (err) { showError(serverText(err, 'the customer list')); }
 });</script>
 </body>

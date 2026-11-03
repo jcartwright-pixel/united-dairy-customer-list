@@ -7,14 +7,14 @@
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>Customers · Customer List</title>
+  <title>Routes · Customer List</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/udcl.css">
     <script src="js/udcl-rules.js"></script>
 </head>
-<!-- Joe 11/1: the United Dairy Customer List (UDCL), the one customer list every app reads. See it by customer, by route or by
+<!-- Joe 11/3: this screen is named Routes; the master list is Customers. Joe 11/1: the United Dairy Customer List (UDCL), the one customer list every app reads. See it by customer, by route or by
      day, and a Directory, sort and filter it, change a customer, and print any of it from the Print menu. -->
-<body class="fill udcl-page" data-help="customers">
+<body class="fill udcl-page" data-help="routes">
   <div class="signin" id="signin" hidden>
     <h1>Customer List</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -28,7 +28,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">United Dairy Customer List · <span id="plant-name"></span></span><h1>Customers</h1></div>
+      <div class="title"><span class="eyebrow">United Dairy Customer List · <span id="plant-name"></span></span><h1>Routes</h1></div>
       <div class="tabs" role="tablist" id="views">
         <button type="button" role="tab" data-view="customer" aria-selected="true">By Customer</button>
         <button type="button" role="tab" data-view="route" aria-selected="false">By Route</button>

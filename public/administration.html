@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="css/udcl.css">
 </head>
 <!-- Joe 11/1: the truck kiosk "shouldn't even be in this menu. That should be put in the administration tab as only a link. I should
-     be able to view it and see how it looks, but that's it." Administrators only. -->
+     be able to view it and see how it looks, but that's it." Administrators only.
+     Joe 11/3: "in administration is where I'd like to add groups." The master list moved out to its own tab, Customers. -->
 <body class="udcl-page" data-help="administration">
   <div class="signin" id="signin" hidden>
     <h1>Administration</h1>
@@ -30,21 +31,17 @@
     <p class="udcl-help" id="not-admin" hidden>Only an administrator can use Administration.</p>
     <div class="udcl-home admin-only" id="tiles">
       <a href="load-map.html?kiosk=1" id="kiosk-link"><strong>Load Map Kiosk</strong>See how the plant floor kiosk looks: today's routes, the truck on one side and the customers on the other. Nothing can be changed from it.</a>
-      <a href="master-customers.html" id="master-link"><strong>Master Customer List</strong>Every customer of every location, Active or Inactive, with addresses, GPS and phones. Sort by location or name, or by any heading. Upload the master address list here.</a>
-      <a href="customers.html"><strong>Upload the Route Menu</strong>On Customers, press Upload Route Menu. A new upload replaces the routes; changes made here stay until the next upload.</a>
+      <a href="customers.html"><strong>Upload the Route Menu</strong>On Routes, press Upload Route Menu. A new upload replaces the routes; changes made here stay until the next upload.</a>
     </div>
+    <section class="adm-groups admin-only" id="groups-box" aria-labelledby="groups-title">
+      <h2 id="groups-title">Groups</h2>
+      <p class="udcl-help">The groups a customer can be put in. A customer's group is set on <a href="master-customers.html">Customers</a>, in the Group column. Renaming a group changes it on every customer in it; removing one takes it off them.</p>
+      <form class="adm-add" id="g-add-form"><input id="g-new" maxlength="40" placeholder="New group name" aria-label="New group name" autocomplete="off"><button type="submit" class="primary">Add group</button></form>
+      <div id="g-msg" class="adm-msg" role="status"></div>
+      <table class="adm-table"><thead><tr><th class="l">Group</th><th>Customers</th><th></th></tr></thead><tbody id="g-rows"></tbody></table>
+    </section>
     <p class="udcl-help admin-only" id="imported"></p>
   </div>
-  <script type="module">import { requireSignIn, showError, serverText, shortDate } from './js/shell.js';
-import { readList } from './js/udcl.js';
-requireSignIn(async () => {
-  try {
-    const d = await readList();
-    document.getElementById('plant-name').textContent = d.plantName || '';
-    document.getElementById('not-admin').hidden = !!d.canImport;
-    const m = d.imported;
-    document.getElementById('imported').textContent = m && m.at ? 'Last import ' + shortDate(m.at) + ' by ' + (m.by || '') + (m.fileName ? ' from ' + m.fileName : '') + '.' : 'Nothing has been imported for this plant yet.';
-  } catch (err) { showError(serverText(err, 'the customer list')); }
-});</script>
+  <script type="module">import './js/udcl-admin.js';</script>
 </body>
 </html>

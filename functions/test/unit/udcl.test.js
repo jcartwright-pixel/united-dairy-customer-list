@@ -515,3 +515,31 @@ test('the hub\'s app ticks decide who opens Customers & Routes once saved', asyn
   db.docs.set('appAccess/disp@example.com', { apps: ['operations', 'customers'] });
   await S.udclCall(db, disp, PLANT, { op: 'view' });
 });
+
+test('Joe 11/3: groups are added, renamed and removed on Administration, and set on Customers one or many at a time', async () => {
+  const { db } = await imported();
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'saveGroups', add: 'Corner Stores' }, now), /administrator/);
+  let out = await S.udclCall(db, boss, PLANT, { op: 'saveGroups', add: 'Corner Stores' }, now);
+  assert.deepEqual(out.groups, [{ name: 'Corner Stores', customers: 0 }]);
+  await assert.rejects(S.udclCall(db, boss, PLANT, { op: 'saveGroups', add: 'corner stores' }, now), /already a group/);
+  await S.udclCall(db, boss, PLANT, { op: 'saveGroups', add: 'Best Foods' }, now);
+  assert.deepEqual((await S.udclCall(db, disp, PLANT, { op: 'view' })).groups, ['Best Foods', 'Corner Stores']);
+  // A Manager sets the group, on one customer or many; only those customers come back.
+  await assert.rejects(S.udclCall(db, disp, PLANT, { op: 'setGroup', keys: ['5001'], group: 'Corner Stores' }, now), /Administrator or Manager/);
+  const one = await S.udclCall(db, mgr, PLANT, { op: 'setGroup', keys: ['5001'], group: 'Corner Stores' }, now);
+  assert.equal(one.customers['5001'].group, 'Corner Stores'); assert.match(one.message, /is in Corner Stores now/);
+  const many = await S.udclCall(db, mgr, PLANT, { op: 'setGroup', keys: ['5003', '5004'], group: 'Corner Stores' }, now);
+  assert.equal(many.changed, 2); assert.match(many.message, /^2 customers are in Corner Stores now/);
+  assert.ok((await S.salesRows(db, PLANT)).rows.some(r => r.account === '5001' && r.group === 'Corner Stores'), 'the Sales app gets the group');
+  // Renaming follows on every customer in it; removing takes it off them.
+  out = await S.udclCall(db, boss, PLANT, { op: 'saveGroups', rename: { from: 'Corner Stores', to: 'Corner Shops' } }, now);
+  assert.match(out.message, /3 customers moved to Corner Shops/);
+  assert.deepEqual(out.groups, [{ name: 'Best Foods', customers: 0 }, { name: 'Corner Shops', customers: 3 }]);
+  assert.equal(db.docs.get('udclCustomers/' + PLANT + '__5004').group, 'Corner Shops');
+  await assert.rejects(S.udclCall(db, boss, PLANT, { op: 'saveGroups', rename: { from: 'Best Foods', to: 'corner shops' } }, now), /already a group/);
+  out = await S.udclCall(db, boss, PLANT, { op: 'saveGroups', remove: 'Corner Shops' }, now);
+  assert.deepEqual(out.groups, [{ name: 'Best Foods', customers: 0 }]);
+  assert.equal(db.docs.get('udclCustomers/' + PLANT + '__5001').group, '');
+  const empty = await S.udclCall(db, mgr, PLANT, { op: 'setGroup', keys: ['5002'], group: '' }, now);
+  assert.match(empty.message, /has no group now/);
+});
