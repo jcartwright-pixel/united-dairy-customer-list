@@ -238,7 +238,7 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .ml-picked { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px; border-radius: 12px; background: #fff; border: 2px solid var(--ud-blue); box-shadow: 0 8px 24px rgba(10, 25, 45, .25); }
 .ml-picked b { color: var(--ud-blue-dark); white-space: nowrap; font-size: 16px; margin-right: 4px; }
 .ml-picked button { min-height: 36px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--ud-blue); background: var(--ud-blue); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.ml-picked button#pick-on { background: #fff; color: var(--ud-blue); }
+.ml-picked button#pick-on, .ml-picked button#pick-edit { background: #fff; color: var(--ud-blue); }
 .ml-picked button.quiet { background: none; border-color: transparent; color: var(--muted); }
 .ml-page .ml-table.has-picked { padding-bottom: 72px; }
 
@@ -257,3 +257,9 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .adm-table input.g-name { width: 100%; min-height: 32px; font: inherit; padding: 0 8px; border: 1px solid var(--ud-blue); border-radius: 6px; }
 .adm-table button { min-height: 32px; padding: 0 12px; font: inherit; font-size: 14px; border: 1px solid var(--ud-blue); border-radius: 7px; background: #fff; color: var(--ud-blue); font-weight: 700; cursor: pointer; }
 .adm-table button.primary { background: var(--ud-blue); color: #fff; }
+
+/* Joe 11/3: "+ New group…" turns the group box into a place to type the new group's name. */
+input.grp-new { width: 100%; min-height: 30px; font: inherit; font-size: 14px; padding: 2px 6px; border: 2px solid var(--ud-blue); border-radius: 6px; background: #fff; box-sizing: border-box; }
+.ml-picked input.grp-new { width: 200px; min-height: 36px; }
+input.grp-new.bad { border-color: #b3261e; }
+.master-table tbody tr[data-key] { cursor: default; }

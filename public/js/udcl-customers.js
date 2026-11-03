@@ -2,7 +2,8 @@
 // filter and sort, a customer's own card (address, phone, keys or door code, notes) and the Print menu. An Administrator imports the
 // Route Menu workbook here (and the Route Book with it), or brings over the Sales app's list.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
-import { readList, saveStep, printMenu, printDoc, tablePage, routeDayPage, sortedRouteDays, routesOf, U } from './udcl.js';
+import { openCard, panel } from './udcl-card.js';
+import { readList, saveStep, savedView, saveView, printMenu, printDoc, tablePage, routeDayPage, sortedRouteDays, routesOf, U } from './udcl.js';
 
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
@@ -10,7 +11,11 @@ const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise(
 const params = new URLSearchParams(location.search);
 // Joe 11/2: the Customer Address List became the master list (the Customers tab since 11/3).
 if (params.get('view') === 'master') location.replace('master-customers.html');
-let data = null, view = ['customer', 'route', 'day', 'list'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'customer';
+// Joe 11/3: the screen opens the way it was left (the tab and the boxes), unless the link says otherwise.
+const VIEWS = ['customer', 'route', 'day', 'list'], BOXES = ['route', 'day', 'dcpick', 'chain', 'sort'];
+let saved = savedView('routes');
+let data = null, view = VIEWS.includes(params.get('view')) ? params.get('view') : VIEWS.includes(saved.view) ? saved.view : 'customer';
+const remember = () => { const v = { view }; BOXES.forEach(id => { v[id] = $(id).value; }); saveView('routes', v); };
 // Worked out once each time the list changes (rebuild), not at every click: the lines, and one row per customer with its deliveries
 // and the text Find looks in.
 let allLines = [], allCustomers = [];
@@ -26,6 +31,8 @@ function fillPickers() {
   keep('chain', chains.map(c => [c, 'Chain ' + c]), 'All chains');
   const dcs = [...new Set(Object.values(data.customers).map(c => U.branchOf(c.dc)).filter(Boolean))].sort(U.byRoute);
   keep('dcpick', dcs.map(d => [d, dcPlain(d)]), 'All DCs');
+  // The first time the boxes are filled, they take the remembered view (a link's route wins).
+  if (saved) { BOXES.forEach(id => { if (saved[id] && [...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id]; }); saved = null; }
   if (params.get('route') && !$('route').value) $('route').value = params.get('route');
 }
 
@@ -103,50 +110,15 @@ function drawFooter() {
 }
 const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Customers.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
 
-/* ---------- a customer's card ---------- */
-function panel(title, body) {
-  closePanel();
-  const p = document.createElement('aside');
-  p.className = 'udcl-panel'; p.id = 'panel';
-  p.innerHTML = '<header><h2>' + e(title) + '</h2><button type="button" id="p-close">Close</button></header><div class="body">' + body + '</div>';
-  document.body.appendChild(p);
-  $('p-close').onclick = closePanel;
-  window.udBack = () => { if ($('panel')) { closePanel(); return true; } return false; };
-  return p;
-}
-function closePanel() { const p = $('panel'); if (p) p.remove(); window.udBack = null; }
-
+/* ---------- a customer's card (the same card as on Customers, udcl-card.js) ---------- */
 function openCustomer(key) {
-  const c = key ? data.customers[key] : null, add = !c, ro = !data.canEdit;
-  const v = (k) => e(c && c[k] !== undefined && c[k] !== null ? c[k] : '');
-  const dis = ro ? ' disabled' : '';
+  const c = key ? data.customers[key] : null;
   const ds = c ? U.customerRows({ [key]: c }, allLines)[0].deliveries : [];
-  const p = panel(add ? 'Add a customer' : c.name, (add ? '<label>Account number<input id="c-account" inputmode="numeric" placeholder="Leave blank if it has none"></label>' : '<div class="deliveries">Account ' + v('account') + (c.active === false ? ' · <b>Not on the Route Menu any more</b>' : '') + '<br>' + (ds.length ? ds.map(d => '<a href="route-sequence.html?route=' + encodeURIComponent(d.route) + '&day=' + d.day + '">' + e(dayName(d.day)) + ' route ' + e(d.route) + ', stop ' + d.stop + '</a>').join('<br>') : 'Not on any route day') + '</div>') +
-    '<label>Name<input id="c-name" value="' + v('name') + '"' + dis + '></label>' +
-    '<div class="two"><label>Chain<input id="c-chain" value="' + v('chain') + '"' + dis + '></label><label>Phone<input id="c-phone" value="' + v('phone') + '"' + dis + '></label></div>' +
-    '<label>Distribution center<select id="c-dc"' + dis + '><option value="">Not set</option>' + (c && U.branchOf(c.dc) && !U.DCS.some(d => d.code === U.branchOf(c.dc)) ? [{ code: U.branchOf(c.dc), name: 'DC ' + U.branchOf(c.dc) }] : []).concat(U.DCS).map(d => '<option value="' + d.code + '"' + ((c ? U.branchOf(c.dc) : (U.PLANT_DC[data.plant] || '')) === d.code ? ' selected' : '') + '>' + d.code + ' ' + e(d.name) + '</option>').join('') + '</select></label>' +
-    (c && (c.addressCheck || c.addressProposed) ? '<div class="deliveries">Address check: ' + e(c.addressCheck || '') + (c.addressProposed ? '<br>Proposed address: <b>' + e(c.addressProposed) + '</b>' : '') + (c.addressNote ? '<br>' + e(c.addressNote) : '') + (c.lat && c.lon ? '<br>GPS ' + e(gpsText(c)) + (c.gpsFrom ? ' (' + e(c.gpsFrom) + ')' : '') : '') + '</div>' : '') +
-    '<label>Street<input id="c-address" value="' + v('address') + '"' + dis + '></label><label>Street, line 2<input id="c-address2" value="' + v('address2') + '"' + dis + '></label>' +
-    '<div class="three"><label>City<input id="c-city" value="' + v('city') + '"' + dis + '></label><label>State<input id="c-state" value="' + v('state') + '" maxlength="4"' + dis + '></label><label>Zip<input id="c-zip" value="' + v('zip') + '"' + dis + '></label></div>' +
-    '<label>Contact<input id="c-contact" value="' + v('contact') + '"' + dis + '></label>' +
-    '<label>Keys or door code<input id="c-keys" value="' + v('keys') + '"' + dis + '></label>' +
-    '<label>Notes for the driver (shows on the route book at every stop for this customer)<textarea id="c-notes"' + dis + '>' + v('notes') + '</textarea></label>' +
-    (add ? '<button type="button" class="primary" id="c-save">Add customer</button>' : '') + '<div id="c-msg"></div>');
-  const fields = () => { const o = {}; U.CUSTOMER_FIELDS.forEach(k => { const el = $('c-' + k); if (el) o[k] = el.value; }); return o; };
-  const say = (t, cls) => { $('c-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
-  if (ro) return;
-  if (add) {
-    $('c-save').onclick = async () => {
-      try { const out = await saveStep('saveCustomer', { add: true, account: $('c-account').value, fields: fields() }); data.customers[out.customer.key] = out.customer; rebuild(); openCustomer(out.customer.key); }
-      catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
-    };
-    return;
-  }
-  // Every box saves when it is left (as everywhere in Operations).
-  p.querySelectorAll('input, textarea, select').forEach(el => el.addEventListener('change', async () => {
-    try { const out = await saveStep('saveCustomer', { key, fields: { [el.id.slice(2)]: el.value } }); data.customers[key] = out.customer; rebuild(); say('Saved.', 'good'); }
-    catch (err) { say(serverText(err, 'the customer list'), 'bad'); }
-  }));
+  const routesHtml = c ? (c.active === false ? '<b>Not on the Route Menu any more</b><br>' : '') + (ds.length ? ds.map(d => '<a href="route-sequence.html?route=' + encodeURIComponent(d.route) + '&day=' + d.day + '">' + e(dayName(d.day)) + ' route ' + e(d.route) + ', stop ' + d.stop + '</a>').join('<br>') : 'Not on any route day') : '';
+  openCard({ data, key, routesHtml, onSaved: (cust, oldKey, out) => {
+    (out.routeDays || []).forEach(rd => { const i = data.routeDays.findIndex(x => x.route === rd.route && x.day === rd.day); if (i >= 0) data.routeDays[i] = rd; });
+    rebuild();
+  } });
 }
 
 /* ---------- import ---------- */
@@ -224,11 +196,11 @@ function setData(d) {
   rebuild();
 }
 
-document.querySelectorAll('#views button').forEach(b => { b.onclick = () => { view = b.dataset.view; $('sort').value = ''; shown = PAGE; history.replaceState(null, '', '?view=' + view); draw(); }; });
+document.querySelectorAll('#views button').forEach(b => { b.onclick = () => { view = b.dataset.view; $('sort').value = ''; shown = PAGE; history.replaceState(null, '', '?view=' + view); remember(); draw(); }; });
 let typing = null;
 ['q', 'route', 'day', 'chain', 'dcpick', 'sort'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', () => {
   shown = PAGE; clearTimeout(typing);
-  if (id === 'q') typing = setTimeout(draw, 200); else draw();
+  if (id === 'q') typing = setTimeout(draw, 200); else { remember(); draw(); }
 }));
 $('rows').addEventListener('click', ev => {
   const more = ev.target.closest('button[data-more]');

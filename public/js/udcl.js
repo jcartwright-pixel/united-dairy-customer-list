@@ -25,6 +25,10 @@ export async function readList(extra) {
   }
   return d;
 }
+/* ---------- the view each screen remembers (Joe 11/3: "save the view option"), on this computer, for this person ---------- */
+export function savedView(name) { try { return JSON.parse(localStorage.getItem('udcl.view.' + name) || '{}') || {}; } catch (e) { return {}; } }
+export function saveView(name, v) { try { localStorage.setItem('udcl.view.' + name, JSON.stringify(v)); } catch (e) { /* no storage */ } }
+
 export async function saveStep(op, fields) { return callServer('customerList', Object.assign({ op }, fields)); }
 
 /* ---------- other windows (Joe 11/2: the Load Map window opened from Route Book; an edit in one shows in the other) ---------- */

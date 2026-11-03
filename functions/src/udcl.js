@@ -644,8 +644,47 @@ async function saveGroups(db, plant, email, input, stamp) {
   return { ok: true, groups: groups.map(name => ({ name, customers: counts[name] || 0 })), message };
 }
 
-const OPS = { setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+/**
+ * Joe 11/3: "it can change the account number ... So I want to be able to edit the customer." A customer is kept under a key
+ * made from its account number, so a new number moves it to its new key: the customer and every route day stop that has it, in
+ * one go. input: { key, account }. Another DC's customer keeps its D<dc>- start. Sends back the customer, its old key and the
+ * route days that changed.
+ */
+async function changeAccount(db, plant, email, input, stamp) {
+  const key = U.text(input.key, 60), account = U.numText(input.account, U.LIMITS.account);
+  if (!key) fail('BAD_REQUEST', 'Pick a customer.');
+  if (!account) fail('BAD_REQUEST', 'Type the new account number.');
+  const oldRef = db.collection(CUSTOMERS).doc(U.customerId(plant, key)), snap = await oldRef.get();
+  if (!snap.exists) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
+  const before = snap.data();
+  const lead = (/^D\d+-/.exec(key) || [''])[0], newKey = lead + U.custKey(account, before.name);
+  const after = Object.assign({}, before, { key: newKey, account: account === '0' ? '' : account, updatedAt: stamp, updatedBy: email });
+  if (newKey === key) {
+    const batch = db.batch();
+    batch.set(oldRef, after); logEntry(db, batch, 'customer', plant, oldRef, before, after, email, stamp);
+    await batch.commit();
+    return { ok: true, customer: after, oldKey: key, routeDays: [], message: before.name + ' has account ' + (after.account || 'none') + ' now.' };
+  }
+  const newRef = db.collection(CUSTOMERS).doc(U.customerId(plant, newKey)), taken = await newRef.get();
+  if (taken.exists) fail('BAD_REQUEST', 'Account ' + account + ' is already ' + taken.data().name + '. Pick another number.');
+  const writes = [[newRef, null, after, 'customer'], [oldRef, before, null, 'customer']], routeDays = [], on = [];
+  (await db.collection(ROUTE_DAYS).where('plant', '==', plant).get()).docs.forEach(d => {
+    const b = d.data();
+    if (!(b.stops || []).some(x => x.key === key)) return;
+    const a = Object.assign({}, b, { stops: b.stops.map(x => (x.key === key ? Object.assign({}, x, { key: newKey, account: after.account }) : x)), rev: (b.rev || 0) + 1, updatedAt: stamp, updatedBy: email });
+    writes.push([db.collection(ROUTE_DAYS).doc(d.id), b, a, 'routeDay']);
+    routeDays.push(unpack(a)); on.push('route ' + b.route + ' ' + (U.DAY_NAMES[b.day] || b.day));
+  });
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([ref, b, a, what]) => { if (a) batch.set(ref, a); else batch.delete(ref); logEntry(db, batch, what, plant, ref, b, a, email, stamp); });
+    await batch.commit();
+  }
+  return { ok: true, customer: after, oldKey: key, routeDays, message: before.name + ' has account ' + after.account + ' now' + (on.length ? ', on ' + on.join(', ') : '') + '.' };
+}
+
+const OPS = { changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {

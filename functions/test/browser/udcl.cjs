@@ -171,6 +171,33 @@ async function ph0(browser) {
     assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__1526').get()).data().group, 'Kuhn Markets');
     await shot(g, 'udcl-1920-groups');
     await g.close();
+    // Joe 11/3: a new group from the group box itself.
+    await m.click('#rows button.grp[data-key="1196"]');
+    await m.selectOption('#rows select.grp-pick', '+');
+    await m.fill('#rows input.grp-new', 'Honey Bear'); await m.press('#rows input.grp-new', 'Enter');
+    await m.waitForFunction(() => /is in Honey Bear now/.test(document.getElementById('save-msg').textContent));
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__1196').get()).data().group, 'Honey Bear');
+    assert.ok((await db().collection('private').doc('udcl_fac_uniontown').get()).data().groups.includes('Honey Bear'));
+    // Joe 11/3: the view stays as it was left.
+    await m.selectOption('#status', 'Active');
+    await m.click('#thead button[data-col="6"]');
+    await m.reload(); await m.waitForSelector('#rows tr[data-key]');
+    assert.equal(await m.inputValue('#status'), 'Active');
+    assert.equal(await m.getAttribute('#thead button[data-col="6"]', 'aria-sort'), 'ascending');
+    await m.selectOption('#status', '');
+    // Joe 11/3: edit the customer, its account number too: double-click its line for the card.
+    await m.dblclick('#rows tr[data-key="7001"] td:nth-child(8)');
+    await m.waitForSelector('#panel #c-account');
+    await m.fill('#c-account', '7101'); await m.press('#c-account', 'Tab');
+    await m.waitForSelector('#c-msg .good');
+    assert.match(await m.textContent('#c-msg'), /has account 7101 now/);
+    assert.ok(await m.$('#rows tr[data-key="7101"]'), 'the line has its new number');
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__7001').get()).exists, false);
+    await m.fill('#c-name', 'BIRCH STREET DELI & GROCERY'); await m.press('#c-name', 'Tab');
+    await m.waitForFunction(() => document.querySelector('#rows tr[data-key="7101"]').textContent.includes('BIRCH STREET DELI & GROCERY'));
+    assert.equal((await db().collection('udclCustomers').doc('fac_uniontown__7101').get()).data().name, 'BIRCH STREET DELI & GROCERY');
+    await shot(m, 'udcl-1920-customer-edit');
+    await m.click('#p-close');
     await shot(m, 'udcl-1920-master-customers');
     await p.reload();
     await p.waitForSelector('#rows tr[data-key="1196"]');
