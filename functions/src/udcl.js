@@ -40,9 +40,36 @@ async function personOf(db, email) {
   const s = await db.collection('users').doc(safeIdPart(email)).get();
   return s.exists ? s.data() : null;
 }
-function rightsOf(person) {
-  const active = !!(person && String(person.status || '').toUpperCase() === 'ACTIVE');
-  return { view: active, edit: active && (L.isAdmin(person) || L.hasRole(person, EDIT_ROLES)), importList: active && L.isAdmin(person) };
+/*
+ * Who may change what (Joe 11-4-26: the United Dairy Hub's People & Access is where everyone's access is set). Two rights from
+ * Operations' list (functions/src/rights.js there), read from the same places: customers.edit (customers and route days) and
+ * customers.import (import lists; Active or Inactive). A role's saved Role Template decides; a template saved before these
+ * rights existed, or no template, gets the standard (Managers edit, Administrators do everything). A person's own Allow or
+ * Deny (personRights/<email>) wins; Deny over Allow. Without the Hub's lists (access null) it is the old rule: Administrator
+ * or Manager edits, Administrator imports.
+ */
+const NEW_RIGHTS_AT = '2026-11-04T06:00:00.000Z';
+const STANDARD = { MANAGER: ['customers.edit'] };
+function hasRight(person, code, access) {
+  const roles = (person.roles || []).map(L.roleKey), tpl = (access && access.templates) || {}, meta = (access && access.meta) || {}, ex = (access && access.exceptions) || {};
+  if ((ex.denials || []).indexOf(code) >= 0) return false;
+  if ((ex.grants || []).indexOf(code) >= 0) return true;
+  return roles.some(r => {
+    const saved = Array.isArray(tpl[r]) ? tpl[r] : null, std = (STANDARD[r] || []).indexOf(code) >= 0;
+    if (!saved) return std;
+    return saved.indexOf(code) >= 0 || (std && String((meta[r] && meta[r].updatedAt) || '') < NEW_RIGHTS_AT);
+  });
+}
+function rightsOf(person, access) {
+  const active = !!(person && String(person.status || '').toUpperCase() === 'ACTIVE'), admin = active && L.isAdmin(person);
+  if (!access) return { view: active, edit: active && (admin || L.hasRole(person, EDIT_ROLES)), importList: admin };
+  return { view: active, edit: admin || (active && hasRight(person, 'customers.edit', access)), importList: admin || (active && hasRight(person, 'customers.import', access)) };
+}
+// Role Templates and the person's own Allow / Deny, as Operations keeps them.
+async function accessOf(db, email) {
+  const [tpl, ex] = await Promise.all([db.collection('private').doc('roleTemplates').get(), db.collection('personRights').doc(safeIdPart(email)).get()]);
+  const t = tpl.exists ? tpl.data() : {};
+  return { templates: t.templates || {}, meta: t.meta || {}, exceptions: ex.exists ? ex.data() : {} };
 }
 
 // The map comes back as rows of numbers (the database keeps each row as words, packMap).
@@ -62,7 +89,7 @@ async function readPlant(db, plant) {
 
 /** What every screen gets: the plant's customers and route days, and what this person may change. */
 async function view(db, plant, person, opts) {
-  const d = await readPlant(db, plant), r = rightsOf(person);
+  const d = await readPlant(db, plant), r = (opts && opts.rights) || rightsOf(person);
   // Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system." Only the Master Customer List (an
   // administrator, asking with all) gets the inactive ones.
   const all = !!(opts && opts.all && r.importList);
@@ -691,8 +718,8 @@ async function udclCall(db, who, plant, input, deps) {
   input = input || {};
   const op = String(input.op || 'view');
   const email = String(who && who.email || '').toLowerCase();
-  const [person, access] = await Promise.all([personOf(db, email), db.collection('appAccess').doc(safeIdPart(email)).get()]);
-  const r = rightsOf(person);
+  const [person, access, rights] = await Promise.all([personOf(db, email), db.collection('appAccess').doc(safeIdPart(email)).get(), accessOf(db, email)]);
+  const r = rightsOf(person, rights);
   if (!r.view) fail('NOT_ALLOWED', 'You are not on the Users list. Ask an administrator to add you.');
   // Joe 11-3-26: the United Dairy Hub's People & Access ticks each app per person; once Customers & Routes is ticked or
   // unticked for someone, that tick decides (until then, everyone Enabled, as before).
@@ -701,14 +728,14 @@ async function udclCall(db, who, plant, input, deps) {
   // No plant named (the first time on this browser): the person's first plant that is running.
   if (!plant) plant = L.plantsFor(person).find(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE') || L.HOME_PLANT;
   if (L.plantsFor(person).indexOf(plant) < 0) fail('NOT_ALLOWED', 'You are not set up for ' + plantName(plant) + '.');
-  if (op === 'view') return view(db, plant, person, input);
+  if (op === 'view') return view(db, plant, person, Object.assign({}, input, { rights: r }));
   if (op === 'routeBook') return routeBook(db, plant, input.route, input.day);
   const fn = OPS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Customer List step: ' + op);
-  if (!r[NEEDS[op]]) fail('NOT_ALLOWED', NEEDS[op] === 'importList' ? 'Only an administrator can import the customer list.' : 'Only an Administrator or Manager can change the customer list and route sequence.');
+  if (!r[NEEDS[op]]) fail('NOT_ALLOWED', NEEDS[op] === 'importList' ? 'Only an administrator can import the customer list (or someone allowed it in the United Dairy Hub, People & Access).' : 'Only an Administrator or Manager can change the customer list and route sequence (or someone allowed it in the United Dairy Hub, People & Access).');
   const stamp = ((deps && deps.now) ? deps.now() : new Date()).toISOString();
   const out = await fn(db, plant, email, input, stamp);
-  return Object.assign(out, input.thenView ? await view(db, plant, person, input) : {});
+  return Object.assign(out, input.thenView ? await view(db, plant, person, Object.assign({}, input, { rights: r })) : {});
 }
 
 /** The Sales app's lines from the Customer List: { rows: [{ day, route, account, chain, name }], savedAt }, or null when it has none. */

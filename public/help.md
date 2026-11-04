@@ -25,7 +25,7 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 
 1. Pick a tab: `By Customer` (one line per customer: chain, account, customer, distribution center, then a column for each day from Sunday to Saturday showing the route that delivers that day), `By Route` (each route and day with its stops in order), `By Day` (each day with its routes) or `Directory` (every customer with no routes: distribution center, chain, account, name, address, GPS and phone; the GPS opens the spot in Google Maps). An **inactive** customer (set on **Customers**) is not shown here, nor anywhere else. A customer's group is set on **Customers**.
 2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** (not on `Directory`), **DC** and **Chain**. **Sort by** changes the order.
-3. Tap a line to open the customer's card: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, address, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it. A new account number moves the customer and its route day stops to the new number. In **Group**, `+ New group…` (administrators) adds a group: type its name and press Enter.
+3. Tap a line to open the customer's card: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, address, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them (or anyone allowed **Edit customers and route days** in the United Dairy Hub, People & Access); each box saves when you leave it. A new account number moves the customer and its route day stops to the new number. In **Group**, `+ New group…` (administrators) adds a group: type its name and press Enter.
 4. The screen opens the way you left it: the tab, **Route**, **Day**, **DC**, **Chain** and **Sort by** are kept on this computer.
 5. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
 
@@ -103,7 +103,7 @@ One route on one day, its stops in the order the driver runs them. This is where
 7. `Load Map` opens the truck load map in its own window: the truck, the customers and their load sequence, nothing else. Change the run order, a load sequence or the truck there, and this screen shows it at once (and the other way round).
 8. `Print` opens the print menu: this route day for the office, the driver's route book page (with keys, Time in and Time out boxes, the instructions and the load map), this route day's load map, every day of this route, every route on this day, or the whole route book.
 
-- Only an Administrator or Manager can change the order. Everyone else can look and print.
+- An Administrator or Manager (or anyone allowed it in the United Dairy Hub, People & Access) can change the order. Everyone else can look and print.
 - Every change saves by itself. If someone else changed the same route day a moment before, the screen says so and shows their change; make yours again.
 
 > A stop added to a day goes in by its load sequence (after the stops with the same or a higher number). Drag it if it belongs somewhere else.
@@ -129,7 +129,7 @@ How the truck is loaded for one route day: the truck seen from above on the left
 7. `Print` opens the print menu: this load map with its customers, every load map for the day, or every day of the route.
 
 - A new route day starts from the 2024 Route Book's drawing when its numbers still match, otherwise it is built from the load sequence.
-- Only an Administrator or Manager can change the order, the load sequence and the map. Every change saves by itself, and shows on Route Book and on the drivers' phones too.
+- An Administrator or Manager (or anyone allowed it in the United Dairy Hub, People & Access) can change the order, the load sequence and the map. Every change saves by itself, and shows on Route Book and on the drivers' phones too.
 - A new upload of the Route Menu replaces the load sequence, and the Route Book's run order if it is picked.
 
 !> Do not give two different stops' products the same spot by mistake: after changing a load number, check the truck still matches, or press `Rebuild from load sequence`.
