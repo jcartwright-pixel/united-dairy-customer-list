@@ -28,4 +28,4 @@ function plantsFor(person) {
 }
 const safeIdPart = (value) => String(value || '').trim().replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, '').slice(0, 200);
 
-module.exports = { PLANTS, HOME_PLANT, hasRole, isAdmin, plantsFor, safeIdPart };
+module.exports = { PLANTS, HOME_PLANT, hasRole, isAdmin, plantsFor, safeIdPart, roleKey };

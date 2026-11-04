@@ -561,3 +561,18 @@ test('Joe 11/3: a new account number moves the customer to its new key, with its
   const same = await S.udclCall(db, mgr, PLANT, { op: 'changeAccount', key: '6001', account: '6001.0' }, now);
   assert.equal(same.customer.key, '6001'); assert.deepEqual(same.routeDays, []);
 });
+
+test('who may change what follows the United Dairy Hub (Joe 11-4-26): role standard, saved templates, Allow and Deny', () => {
+  const { rightsOf } = require('../../src/udcl');
+  const none = { templates: {}, meta: {}, exceptions: {} };
+  const mgr = { status: 'ACTIVE', roles: ['Manager'] }, sup = { status: 'ACTIVE', roles: ['Supervisor'] }, adm = { status: 'ACTIVE', roles: ['Administrator'] };
+  assert.deepEqual(rightsOf(mgr, none), { view: true, edit: true, importList: false }, 'a Manager edits by standard');
+  assert.deepEqual(rightsOf(sup, none), { view: true, edit: false, importList: false });
+  assert.deepEqual(rightsOf(adm, none), { view: true, edit: true, importList: true });
+  assert.equal(rightsOf(sup, Object.assign({}, none, { exceptions: { grants: ['customers.edit', 'customers.import'] } })).importList, true, 'Allow for one person');
+  assert.equal(rightsOf(mgr, Object.assign({}, none, { exceptions: { denials: ['customers.edit'] } })).edit, false, 'Deny for one person');
+  assert.equal(rightsOf(mgr, { templates: { MANAGER: ['dashboard.read'] }, meta: { MANAGER: { updatedAt: '2026-10-20T00:00:00.000Z' } }, exceptions: {} }).edit, true, 'a template saved before the right keeps the standard');
+  assert.equal(rightsOf(mgr, { templates: { MANAGER: ['dashboard.read'] }, meta: { MANAGER: { updatedAt: '2026-11-05T00:00:00.000Z' } }, exceptions: {} }).edit, false, 'a template saved after decides');
+  assert.equal(rightsOf({ status: 'ACTIVE', roles: ['Sales'] }, { templates: { SALES: ['customers.edit'] }, meta: {}, exceptions: {} }).edit, true, 'a role ticked in Roles & Rights');
+  assert.deepEqual(rightsOf({ status: 'INACTIVE', roles: ['Administrator'] }, none), { view: false, edit: false, importList: false });
+});
