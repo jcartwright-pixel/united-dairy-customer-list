@@ -301,10 +301,55 @@
         var c = customers[s.key] || {};
         out.push({ key: s.key, account: c.account || s.account || '', name: c.name || s.name || '', chain: c.chain || s.chain || '', route: rd.route, day: rd.day,
           stop: i + 1, loadSeq: s.loadSeq || 0, note: s.note || '', city: c.city || '', address: c.address || '', state: c.state || '', zip: c.zip || '',
-          keys: c.keys || '', phone: c.phone || '', active: c.active !== false });
+          keys: c.keys || '', phone: c.phone || '', active: c.active !== false,
+          palletUses: (rd.palletUses || {})[s.key] || '', caseWeeks: (rd.cases || {})[s.key] || null });
       });
     });
     return out;
+  }
+
+  /* ---------- cases per delivery (Joe 11-6-26) ----------
+   * "use that information to get each store average cases, the high and then the low ... I want minimum, maximum, and average".
+   * The weeks come from the Hub's Weekly Route Report (routeWeekly, MIS's weekly cases by route and store). For one customer on
+   * one route day: one number per week it was delivered that day, its cases. Pallet Builder holds the customer's pallet space at
+   * the number its PALLET USES picks (Joe: "if we're going to use the high number ... it'll be shaded in ... if it's more, then
+   * we'll have to add"), and the standard for every customer is set on Pallet Rules.
+   */
+  var CASE_RULES = ['HIGH', 'LOW', 'MIDDLE', 'AVERAGE', 'LAST'];
+  var CASE_RULE_NAMES = { HIGH: 'High', LOW: 'Low', MIDDLE: 'Middle', AVERAGE: 'Average', LAST: 'Last weeks average' };
+  var PALLET_RULES = { standard: 'HIGH', weeks: 5, cratesPerPallet: 54, cratesPerStack: 6, dispensersPerPallet: 45, boxIsCrate: true, toteSpots: 1, newPalletEachSeq: true, under: 'KEEP', over: 'ADD' };
+  function ruleOf(v) { var t = text(v).toUpperCase(); return CASE_RULES.indexOf(t) >= 0 ? t : ''; }
+  function whole(v, lo, hi, dflt) { var n = Math.round(Number(v)); return isFinite(n) && n >= lo && n <= hi ? n : dflt; }
+  /** Pallet Rules as saved, with anything missing or wrong put back to the standard. */
+  function palletRules(v) {
+    var r = v || {}, d = PALLET_RULES;
+    return { standard: ruleOf(r.standard) || d.standard, weeks: whole(r.weeks, 1, 52, d.weeks),
+      cratesPerPallet: whole(r.cratesPerPallet, 1, 200, d.cratesPerPallet), cratesPerStack: whole(r.cratesPerStack, 1, 20, d.cratesPerStack),
+      dispensersPerPallet: whole(r.dispensersPerPallet, 1, 200, d.dispensersPerPallet), boxIsCrate: r.boxIsCrate === undefined ? d.boxIsCrate : !!r.boxIsCrate,
+      toteSpots: whole(r.toteSpots, 1, 6, d.toteSpots), newPalletEachSeq: r.newPalletEachSeq === undefined ? d.newPalletEachSeq : !!r.newPalletEachSeq,
+      under: r.under === 'SHRINK' ? 'SHRINK' : 'KEEP', over: r.over === 'NONE' ? 'NONE' : 'ADD' };
+  }
+  /**
+   * weeks = [[week ending, cases], ...] (any order; a week with no delivery is not in it). Returns the numbers the screens show:
+   * low, middle (the delivery in the middle), average, high, last (average of the newest `n` weeks), n deliveries, newest week.
+   */
+  function caseStats(weeks, n) {
+    var w = (weeks || []).filter(function (x) { return x && isFinite(Number(x[1])) && Number(x[1]) > 0; })
+      .map(function (x) { return [String(x[0]), Number(x[1])]; }).sort(function (a, b) { return a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0; });
+    if (!w.length) return null;
+    var v = w.map(function (x) { return x[1]; }), sorted = v.slice().sort(function (a, b) { return a - b; });
+    var mid = sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    var sum = function (a) { return a.reduce(function (t, x) { return t + x; }, 0); };
+    var lastN = v.slice(0, Math.max(1, n || PALLET_RULES.weeks));
+    var r1 = function (x) { return Math.round(x * 10) / 10; };
+    return { low: Math.round(sorted[0]), middle: r1(mid), average: r1(sum(v) / v.length), high: Math.round(sorted[sorted.length - 1]),
+      last: r1(sum(lastN) / lastN.length), lastWeeks: lastN.length, deliveries: v.length, newest: w[0][0], oldest: w[w.length - 1][0] };
+  }
+  /** The number a customer's pallet space is held for: its own PALLET USES, else the standard. */
+  function heldCases(stats, rule, standard) {
+    if (!stats) return 0;
+    var r = ruleOf(rule) || ruleOf(standard) || PALLET_RULES.standard;
+    return Math.ceil({ HIGH: stats.high, LOW: stats.low, MIDDLE: stats.middle, AVERAGE: stats.average, LAST: stats.last }[r]);
   }
 
   var SORTS = {
@@ -493,5 +538,6 @@
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, byName: byName, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
-    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, ADDRESS_FIELDS: ADDRESS_FIELDS };
+    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, ADDRESS_FIELDS: ADDRESS_FIELDS,
+    CASE_RULES: CASE_RULES, CASE_RULE_NAMES: CASE_RULE_NAMES, PALLET_RULES: PALLET_RULES, ruleOf: ruleOf, palletRules: palletRules, caseStats: caseStats, heldCases: heldCases };
 });

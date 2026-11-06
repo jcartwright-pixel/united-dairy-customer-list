@@ -56,6 +56,11 @@ async function ph0(browser) {
   // The 805 Thursday made-up Route Book: run order, a key and instructions.
   const book = { '805|THU': { startTime: '2:30 AM', instructions: ['Call the DQ before 6 AM'], stops: [{ account: '40121', name: 'A PLUS MAPLE #7517', run: 1, keys: 'Ring 4' }, { account: '1707', name: 'CASH N SAVE - COD', run: 2 }, { account: '13590', name: 'DQ BETHEL KNOLL', run: 3 }], grid: [] } };
   await S.udclCall(db(), { email: EMAIL }, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted, addresses: { 1196: { address: '12 ELM ST', city: 'MAPLETON', state: 'PA', zip: '15401' } }, book, fileName: 'Made Up Route Menu.xlsb' });
+  // Joe 11-6-26: three made-up weeks of the Hub's Weekly Route Report (routeWeekly), for the case columns on Routes.
+  const wk = (week, rows) => db().collection('routeWeekly').doc(week).set({ week_ending: week, stops: rows.map(([route, no, name, thu, sat]) => ({ route, chain: '0', customer_no: no, customer: name, sun: 0, mon: 0, tue: 0, wed: 0, thu, fri: 0, sat, deliveries: 1, net_sales: 0 })) });
+  await wk('2026-07-11', [['805', '13590', 'DQ BETHEL KNOLL', 46, 30], ['805', '40121', 'A PLUS MAPLE #7517', 52, 0]]);
+  await wk('2026-10-24', [['805', '13590', 'DQ BETHEL KNOLL', 9, 12], ['805', '40121', 'A PLUS MAPLE #7517', 18, 0]]);
+  await wk('2026-10-31', [['805', '13590', 'DQ BETHEL KNOLL', 21, 0], ['805', '40121', 'A PLUS MAPLE #7517', 0, 0]]);
 
   // CHROME_PATH: a Chromium already on the computer (a test machine without Playwright's own download).
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
@@ -74,7 +79,20 @@ async function ph0(browser) {
     await p.selectOption('#route', '805');
     assert.equal(await p.textContent('#count'), '4 deliveries');
     assert.match(await p.textContent('#rows tr.group'), /Route 805 · Thursday/);
+    // Joe 11-6-26: Low, Middle, Average, High and Last 5 weeks beside the run and load sequence, and PALLET USES (standard High).
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Day', 'Route', 'Run Seq', 'Load Seq', 'Account', 'Customer', 'City', 'Low', 'Middle', 'Average', 'High', 'Last 5 wks', 'Pallet uses', 'Stop note']);
+    const caseCols = async (key, day) => p.$$eval('#rows tr[data-key="' + key + '"]', (rows, d) => rows.filter(r => r.children[0].textContent === d).map(r => [...r.children].slice(7, 12).map(c => c.textContent))[0], day);
+    assert.deepEqual(await caseCols('13590', 'Thu'), ['9', '21', '25.3', '46', '25.3']);
+    assert.deepEqual(await caseCols('13590', 'Sat'), ['12', '21', '21', '30', '21']);
+    assert.deepEqual(await caseCols('40121', 'Thu'), ['18', '35', '35', '52', '35']);
+    assert.equal(await p.$eval('#rows tr[data-key="13590"] td.held', t => t.textContent), '46', 'the High is the number held (the standard)');
+    assert.match(await p.textContent('#imported'), /Cases: cases per delivery from 3 weeks of the Weekly Route Report/);
+    await p.selectOption('#rows tr[data-key="13590"] select.uses >> nth=0', 'LAST');
+    await p.waitForFunction(() => document.querySelector('#rows tr[data-key="13590"] td.held') && document.querySelector('#rows tr[data-key="13590"] td.held').textContent === '25.3');
+    assert.equal((await db().collection('udclRouteDays').doc('fac_uniontown__805__THU').get()).data().palletUses['13590'], 'LAST');
+    assert.equal(await p.$eval('#rows tr[data-key="13590"] select.uses', x => x.value), 'LAST', 'it stays after the list is drawn again');
     await shot(p, 'udcl-1920-by-route');
+    if (SHOTS) { await p.setViewportSize({ width: 1536, height: 790 }); await shot(p, 'udcl-1536-by-route-cases'); await p.setViewportSize({ width: 1920, height: 950 }); }
     await p.click('#views [data-view="day"]');
     await p.selectOption('#route', '');
     await p.selectOption('#day', 'TUE');
