@@ -28,6 +28,17 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 3. Tap a line to open the customer's card: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, address, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them (or anyone allowed **Edit customers and route days** in the United Dairy Hub, People & Access); each box saves when you leave it. A new account number moves the customer and its route day stops to the new number. In **Group**, `+ New group…` (administrators) adds a group: type its name and press Enter.
 4. The screen opens the way you left it: the tab, **Route**, **Day**, **DC**, **Chain** and **Sort by** are kept on this computer.
 5. In `By Route` and `By Day`, `Open in Route Book` on a route's heading opens that route day to change its order.
+6. In `By Route` and `By Day`, each stop shows its cases on that route day from the weekly route report (kept in the United Dairy Hub, **Weekly Route Report**): **Low**, **Middle**, **Average** and **High** over every week kept, and **Last 5 wks** (the average of the newest weeks; how many weeks is set on **Pallet Rules** in the Pallet Builder). Only weeks the store got a delivery that day count. The number the Pallet Builder holds space for is shaded yellow.
+7. **Pallet uses** picks which number the Pallet Builder holds for that stop on that route day. Leave it blank to use the standard rule on **Pallet Rules** (High unless it was changed). It saves by itself.
+
+### Case columns
+
+- **No weeks yet** means no weekly route report has that store on that route and day.
+- The line at the bottom says how many weeks are kept and the newest week ending.
+
+> Summer weeks are bigger (Dairy Queens most of all), so High is the summer number. Keeping High holds a full pallet all year; the Pallet Builder never makes the space smaller.
+
+!> Do not pick Low for a store that grows in summer: the pallet will come up short when it does.
 
 ### Buttons
 

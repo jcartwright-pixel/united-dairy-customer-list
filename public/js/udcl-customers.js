@@ -91,22 +91,47 @@ function draw() {
   } else {
     const lines = U.pick(allLines, fl);
     const grp = (l) => view === 'route' && (!$('sort').value || $('sort').value === 'route') ? 'Route ' + l.route + ' · ' + dayName(l.day) : view === 'day' && (!$('sort').value || $('sort').value === 'day') ? dayName(l.day) + ' · Route ' + l.route : '';
-    $('thead').innerHTML = '<tr><th style="width:8%">Day</th><th style="width:7%">Route</th><th style="width:7%">Run Seq</th><th style="width:7%">Load Seq</th><th style="width:9%">Account</th><th class="l" style="width:24%">Customer</th><th class="l" style="width:16%">City</th><th class="l">Stop note</th></tr>';
+    // Joe 11-6-26: each customer's cases per delivery on that route day (from the Hub's Weekly Route Report), beside the run and
+    // load sequence, and PALLET USES: the number Pallet Builder holds pallet space for (blank = the standard on Pallet Rules).
+    const pr = data.palletRules || U.PALLET_RULES, std = 'Standard (' + U.CASE_RULE_NAMES[pr.standard] + ')';
+    $('thead').innerHTML = '<tr><th style="width:5%">Day</th><th style="width:5%">Route</th><th style="width:5%">Run Seq</th><th style="width:5%">Load Seq</th><th style="width:7%">Account</th><th class="l" style="width:19%">Customer</th><th class="l" style="width:10%">City</th>' +
+      '<th class="cs" style="width:5%">Low</th><th class="cs" style="width:5.5%">Middle</th><th class="cs" style="width:6%">Average</th><th class="cs" style="width:5%">High</th><th class="cs" style="width:6%" title="Average of the newest ' + pr.weeks + ' weeks">Last ' + pr.weeks + ' wks</th><th class="cs" style="width:11%">Pallet uses</th><th class="l">Stop note</th></tr>';
     let last = null;
     $('rows').innerHTML = lines.map(l => {
-      const g = grp(l), head = g && g !== last ? '<tr class="group"><td colspan="8" class="l">' + e(g) + ' &nbsp; <a href="route-sequence.html?route=' + encodeURIComponent(l.route) + '&day=' + l.day + '">Open in Route Book &rarr;</a></td></tr>' : '';
+      const g = grp(l), head = g && g !== last ? '<tr class="group"><td colspan="14" class="l">' + e(g) + ' &nbsp; <a href="route-sequence.html?route=' + encodeURIComponent(l.route) + '&day=' + l.day + '">Open in Route Book &rarr;</a></td></tr>' : '';
       last = g;
-      return head + '<tr class="pick" data-key="' + e(l.key) + '"><td>' + e(dayName(l.day).slice(0, 3)) + '</td><td>' + e(l.route) + '</td><td><span class="stopno">' + l.stop + '</span></td><td>' + (l.loadSeq || '<span class="warnline">-</span>') + '</td><td>' + e(l.account) + '</td><td class="l"><b>' + e(l.name) + '</b></td><td class="l">' + e(l.city) + '</td><td class="l">' + e(l.note) + '</td></tr>';
-    }).join('') || '<tr><td colspan="8" class="empty">' + (allLines.length ? 'No delivery matches these boxes.' : emptyText()) + '</td></tr>';
+      return head + '<tr class="pick" data-key="' + e(l.key) + '"><td>' + e(dayName(l.day).slice(0, 3)) + '</td><td>' + e(l.route) + '</td><td><span class="stopno">' + l.stop + '</span></td><td>' + (l.loadSeq || '<span class="warnline">-</span>') + '</td><td>' + e(l.account) + '</td><td class="l"><b>' + e(l.name) + '</b></td><td class="l">' + e(l.city) + '</td>' + caseCells(l, pr, std) + '<td class="l">' + e(l.note) + '</td></tr>';
+    }).join('') || '<tr><td colspan="14" class="empty">' + (allLines.length ? 'No delivery matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = lines.length + ' deliver' + (lines.length === 1 ? 'y' : 'ies');
   }
+}
+// The case columns for one delivery line. A customer with no weeks yet shows a dash; the number PALLET USES picks is bold.
+function caseCells(l, pr, std) {
+  const st = U.caseStats(l.caseWeeks, pr.weeks);
+  const rule = l.palletUses || pr.standard, on = (r) => r === rule ? ' class="cs held"' : ' class="cs"';
+  const n = (v) => v == null ? '' : String(v);
+  const cells = st ? '<td' + on('LOW') + '>' + n(st.low) + '</td><td' + on('MIDDLE') + '>' + n(st.middle) + '</td><td' + on('AVERAGE') + '>' + n(st.average) + '</td><td' + on('HIGH') + '>' + n(st.high) + '</td><td' + on('LAST') + '>' + n(st.last) + '</td>'
+    : '<td class="cs none" colspan="5">No weeks yet</td>';
+  const pick = data.canEdit
+    ? '<select class="uses" data-route="' + e(l.route) + '" data-day="' + e(l.day) + '" data-key="' + e(l.key) + '" aria-label="Pallet uses for ' + e(l.name) + '"><option value="">' + e(std) + '</option>' +
+      U.CASE_RULES.map(r => '<option value="' + r + '"' + (l.palletUses === r ? ' selected' : '') + '>' + e(r === 'LAST' ? 'Last ' + pr.weeks + ' weeks' : U.CASE_RULE_NAMES[r]) + '</option>').join('') + '</select>'
+    : e(l.palletUses ? (l.palletUses === 'LAST' ? 'Last ' + pr.weeks + ' weeks' : U.CASE_RULE_NAMES[l.palletUses]) : std);
+  return cells + '<td class="cs' + (l.palletUses ? ' own' : '') + '">' + pick + '</td>';
 }
 const lastUpload = (m) => m ? (m.fileName || 'a file') + ', ' + shortDate(m.at) + ' by ' + m.by : '';
 function drawFooter() {
   const im = data.imported, ms = data.master;
   $('imported').innerHTML = [im && '<span><b>Route Menu:</b> ' + e(lastUpload(im)) + ' · ' + (im.counts.customers || 0) + ' customers, ' + (im.counts.routeDays || 0) + ' route days' +
     (im.counts.noLoadSeq ? ' · <span class="warnline">' + im.counts.noLoadSeq + ' stops have no load sequence yet</span>' : '') + '</span>',
-    ms && '<span><b>Master list:</b> ' + e(lastUpload(ms)) + '</span>'].filter(Boolean).join('');
+    ms && '<span><b>Master list:</b> ' + e(lastUpload(ms)) + '</span>',
+    casesLine()].filter(Boolean).join('');
+}
+// Joe 11-6-26: where the case numbers come from, and how many weeks there are.
+function casesLine() {
+  const n = (data.routeDays || []).reduce((a, rd) => Math.max(a, rd.caseWeeks || 0), 0);
+  if (view === 'customer' || view === 'list') return '';
+  return n ? '<span><b>Cases:</b> cases per delivery from ' + n + ' week' + (n === 1 ? '' : 's') + ' of the Weekly Route Report (United Dairy Hub). Dairy Queens are bigger in summer.</span>'
+    : '<span class="warnline"><b>Cases:</b> no weeks yet. An administrator turns on the Weekly Route Report in the United Dairy Hub.</span>';
 }
 const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Customers.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
 
@@ -206,11 +231,23 @@ $('rows').addEventListener('click', ev => {
   const more = ev.target.closest('button[data-more]');
   if (more) { shown = more.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); return; }
   if (ev.target.closest('a, select, input, button')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
+// Joe 11-6-26: PALLET USES saves by itself for that customer on that route day.
+$('rows').addEventListener('change', async ev => {
+  const sel = ev.target.closest('select.uses');
+  if (!sel) return;
+  sel.disabled = true;
+  try {
+    const out = await saveStep('setPalletUses', { route: sel.dataset.route, day: sel.dataset.day, key: sel.dataset.key, rule: sel.value });
+    const rd = data.routeDays.find(x => x.route === out.route && x.day === out.day);
+    if (rd) rd.palletUses = out.palletUses;
+    showError(''); rebuild();
+  } catch (err) { showError(serverText(err, 'the customer list')); sel.disabled = false; }
+});
 $('add').onclick = () => openCustomer(null);
 $('import').onclick = openImport;
 printMenu($('udcl-print-menu'), printItems);
 
 requireSignIn(async () => {
-  try { setData(await readList()); showError(''); }
+  try { setData(await readList({ cases: true })); showError(''); }
   catch (err) { showError(serverText(err, 'the customer list')); }
 });

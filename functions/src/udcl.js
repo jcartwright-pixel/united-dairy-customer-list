@@ -89,7 +89,10 @@ async function readPlant(db, plant) {
 
 /** What every screen gets: the plant's customers and route days, and what this person may change. */
 async function view(db, plant, person, opts) {
-  const d = await readPlant(db, plant), r = (opts && opts.rights) || rightsOf(person);
+  const [d, rules] = await Promise.all([readPlant(db, plant), db.collection('private').doc(RULES_DOC + plant).get()]);
+  const r = (opts && opts.rights) || rightsOf(person);
+  // Joe 11-6-26: each customer's cases on each route day, from the Hub's Weekly Route Report, for the screens that show them.
+  if (opts && opts.cases) await addCases(db, d.routeDays);
   // Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system." Only the Master Customer List (an
   // administrator, asking with all) gets the inactive ones.
   const all = !!(opts && opts.all && r.importList);
@@ -99,7 +102,62 @@ async function view(db, plant, person, opts) {
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
     customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
     master: d.meta && d.meta.master ? d.meta.master : null, routeRule: d.meta && d.meta.routeRule ? d.meta.routeRule : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
-    groups, inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList };
+    groups, inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList, palletRules: U.palletRules(rules.exists ? rules.data() : null) };
+}
+
+/*
+ * Joe 11-6-26 ("use that case count data ... each customer ... put it in our customer list ... The same place in our route books
+ * that we store our sequence and run order"): the Hub keeps MIS's weekly route report week by week (routeWeekly/<week ending>,
+ * Operations' Hub > Weekly Route Report). Each route day's stops get their weeks: rd.cases = { customer key: [[week, cases]] },
+ * a week counted only when the customer had cases on that route on that day. Matched by route and account number.
+ */
+const WEEKLY = 'routeWeekly';
+const DAY_FIELD = { SUN: 'sun', MON: 'mon', TUE: 'tue', WED: 'wed', THU: 'thu', FRI: 'fri', SAT: 'sat' };
+async function addCases(db, routeDays) {
+  const snap = await db.collection(WEEKLY).get();
+  const by = {}; // route|account -> [{week, sun..sat}]
+  snap.docs.forEach(doc => { const w = doc.data(), week = String(w.week_ending || doc.id);
+    (w.stops || []).forEach(st => { const k = String(st.route) + '|' + String(st.customer_no); (by[k] = by[k] || []).push(Object.assign({ week }, st)); }); });
+  routeDays.forEach(rd => {
+    const f = DAY_FIELD[rd.day], out = {};
+    (rd.stops || []).forEach(s => {
+      const list = by[String(rd.route) + '|' + String(s.account || '')] || [];
+      const weeks = list.filter(x => Number(x[f]) > 0.5).map(x => [x.week, Math.round(Number(x[f]) * 10) / 10]);
+      if (weeks.length) out[s.key] = weeks;
+    });
+    rd.cases = out;
+    rd.caseWeeks = snap.size;
+  });
+}
+const RULES_DOC = 'udclPallet_';
+
+/** Joe 11-6-26: PALLET USES for one customer on one route day (blank = the standard on Pallet Rules). Nothing else changes. */
+async function setPalletUses(db, plant, email, input, stamp) {
+  const route = U.numText(input.route, U.LIMITS.route), day = U.dayOf(input.day), key = U.text(input.key, 60), rule = U.ruleOf(input.rule);
+  if (!route || !day || !key) fail('BAD_REQUEST', 'Pick a route, a day and a customer.');
+  if (input.rule && !rule) fail('BAD_REQUEST', 'Pick High, Low, Middle, Average or Last weeks average.');
+  const ref = db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, route, day));
+  return db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) fail('NOT_FOUND', 'Route ' + route + ' ' + U.DAY_NAMES[day] + ' is not on the customer list.');
+    const before = snap.data();
+    if (!(before.stops || []).some(s => s.key === key)) fail('BAD_REQUEST', 'That customer is not on route ' + route + ' ' + U.DAY_NAMES[day] + '.');
+    const uses = Object.assign({}, before.palletUses || {});
+    if (rule) uses[key] = rule; else delete uses[key];
+    tx.update(ref, { palletUses: uses });
+    logEntry(db, tx, 'palletUses', plant, ref, { key, rule: (before.palletUses || {})[key] || '' }, { key, rule }, email, stamp);
+    return { ok: true, route, day, key, rule, palletUses: uses };
+  });
+}
+
+/** Joe 11-6-26: Pallet Rules, the numbers Pallet Builder builds with ("I want all that information in there that can be edited"). */
+async function savePalletRules(db, plant, email, input, stamp) {
+  const ref = db.collection('private').doc(RULES_DOC + plant);
+  const snap = await ref.get(), before = snap.exists ? U.palletRules(snap.data()) : U.palletRules(null);
+  const after = U.palletRules(Object.assign({}, before, input.rules || {}));
+  await ref.set(Object.assign({}, after, { savedAt: stamp, savedBy: email }));
+  await db.collection(LOG).add({ what: 'palletRules', plant, record: ref.id, before, after, by: email, at: stamp });
+  return { ok: true, palletRules: after };
 }
 // Joe 11/3: the groups are added in Administration (kept on the plant's meta), and any group a customer already has counts too.
 function groupsOf(d) {
@@ -710,8 +768,8 @@ async function changeAccount(db, plant, email, input, stamp) {
   return { ok: true, customer: after, oldKey: key, routeDays, message: before.name + ' has account ' + after.account + ' now' + (on.length ? ', on ' + on.join(', ') : '') + '.' };
 }
 
-const OPS = { changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+const OPS = { setPalletUses, savePalletRules, changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
+const NEEDS = { setPalletUses: 'edit', savePalletRules: 'edit', changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
@@ -751,4 +809,4 @@ async function salesRows(db, plant) {
   return { rows, savedAt: at };
 }
 
-module.exports = { udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
+module.exports = { addCases, setPalletUses, savePalletRules, udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };

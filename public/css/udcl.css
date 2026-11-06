@@ -263,3 +263,11 @@ input.grp-new { width: 100%; min-height: 30px; font: inherit; font-size: 14px; p
 .ml-picked input.grp-new { width: 200px; min-height: 36px; }
 input.grp-new.bad { border-color: #b3261e; }
 .master-table tbody tr[data-key] { cursor: default; }
+
+/* Joe 11-6-26: the case columns on Routes (by route, by day) and PALLET USES. */
+.udcl-page th.cs { background: #0b5a2f; }
+.udcl-page td.cs { background: #eef7f0; text-align: center; font-variant-numeric: tabular-nums; }
+.udcl-page td.cs.held { font-weight: 700; box-shadow: inset 0 0 0 2px #f4c430; background: #fff8dc; }
+.udcl-page td.cs.none { color: #5a6b78; font-style: italic; }
+.udcl-page td.cs select.uses { width: 100%; font-size: 15px; padding: 4px; }
+.udcl-page td.cs.own select.uses { color: #9a5b00; font-weight: 700; border-color: #9a5b00; }
