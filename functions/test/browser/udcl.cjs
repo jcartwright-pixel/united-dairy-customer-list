@@ -92,7 +92,9 @@ async function ph0(browser) {
     await m.goto(m.emailFor('master-customers.html'));
     await m.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await m.textContent('#udcl-nav a[aria-current="page"]'), 'Customers');
-    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['', 'Status', 'DC ▲', 'Route', 'Group', 'Chain', 'Account', 'Customer', 'Street', 'Second line', 'City', 'State', 'ZIP', 'Latitude', 'Longitude', 'Phone', 'Match status', 'Coordinate source']);
+    assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['', 'Status', 'DC ▲', 'Group', 'Chain', 'Account', 'Customer', 'Street', 'City', 'State', 'ZIP', 'Phone']);
+    // Joe 11/6: every column fits, no sideways scroll.
+    assert.ok(await m.$eval('#table-wrap', w => w.scrollWidth <= w.clientWidth), 'the Customers list scrolls sideways');
     assert.match(await m.textContent('#card-stats'), /9\s*customers/);
     // Joe 11/3: the upload sits in its own box, so the list keeps the screen.
     assert.equal(await m.isHidden('#upload-box'), true);
@@ -110,12 +112,14 @@ async function ph0(browser) {
     await m.click('#upload-close');
     assert.equal(await m.isHidden('#upload-box'), true);
     assert.match(await m.textContent('#card-last'), /Last master list: Made Up Master List\.csv/);
-    assert.match(await m.textContent('#rows tr[data-key="1196"]'), /39\.900000.*-79\.700000.*555-0199/);
+    // The GPS is read and kept (it feeds the maps), but Customers no longer shows it (Joe 11/6).
+    assert.match(await m.textContent('#rows tr[data-key="1196"]'), /12 ELM ST.*MAPLETON.*555-0199/);
+    assert.doesNotMatch(await m.textContent('#rows tr[data-key="1196"]'), /39\.9/);
     // Sorts: Customer name; a heading pressed twice goes the other way.
     await m.selectOption('#sort', 'name');
     assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '7003', 'a name starting with dots sorts first');
-    await m.click('#thead button[data-col="5"]'); await m.click('#thead button[data-col="5"]');
-    assert.equal(await m.getAttribute('#thead button[data-col="5"]', 'aria-sort'), 'descending');
+    await m.click('#thead button[title="Sort by Account"]'); await m.click('#thead button[title="Sort by Account"]');
+    assert.equal(await m.getAttribute('#thead button[title="Sort by Account"]', 'aria-sort'), 'descending');
     assert.equal(await m.getAttribute('#rows tr[data-key]:first-child', 'data-key'), '40463');
     // Joe 11/3: double-click a status to switch it. It asks first (the customer is on route 808 Monday), then it is off the route.
     m.once('dialog', d => d.accept());
@@ -128,8 +132,8 @@ async function ph0(browser) {
     // Pick rows: a click picks one, Shift-click picks the run between, Clear lets go.
     const shownKeys = await m.$$eval('#rows tr[data-key]', x => x.map(r => r.dataset.key));
     assert.equal(await m.isHidden('#picked'), true);
-    await m.click('#rows tr[data-key="' + shownKeys[0] + '"] td:nth-child(8)');
-    await m.click('#rows tr[data-key="' + shownKeys[3] + '"] td:nth-child(8)', { modifiers: ['Shift'] });
+    await m.click('#rows tr[data-key="' + shownKeys[0] + '"] td:nth-child(7)');
+    await m.click('#rows tr[data-key="' + shownKeys[3] + '"] td:nth-child(7)', { modifiers: ['Shift'] });
     assert.equal(await m.textContent('#picked-n'), '4 picked');
     await m.click('#pick-clear');
     assert.equal(await m.isHidden('#picked'), true);
@@ -137,7 +141,7 @@ async function ph0(browser) {
     const onRoute = new Set((await db().collection('udclRouteDays').get()).docs.flatMap(d => (d.data().stops || []).map(s => s.key)));
     const keys = ['7001', '7002'].filter(k => !onRoute.has(k) && shownKeys.includes(k));
     assert.equal(keys.length, 2, 'two customers on no route');
-    const pickBoth = async () => { for (const k of keys) await m.click('#rows tr[data-key="' + k + '"] td:nth-child(8)'); assert.equal(await m.textContent('#picked-n'), '2 picked'); };
+    const pickBoth = async () => { for (const k of keys) await m.click('#rows tr[data-key="' + k + '"] td:nth-child(7)'); assert.equal(await m.textContent('#picked-n'), '2 picked'); };
     await pickBoth();
     await m.click('#pick-off');
     await m.waitForFunction(() => /2 customers are inactive now/.test(document.getElementById('save-msg').textContent));
@@ -180,13 +184,13 @@ async function ph0(browser) {
     assert.ok((await db().collection('private').doc('udcl_fac_uniontown').get()).data().groups.includes('Honey Bear'));
     // Joe 11/3: the view stays as it was left.
     await m.selectOption('#status', 'Active');
-    await m.click('#thead button[data-col="6"]');
+    await m.click('#thead button[title="Sort by Customer"]');
     await m.reload(); await m.waitForSelector('#rows tr[data-key]');
     assert.equal(await m.inputValue('#status'), 'Active');
-    assert.equal(await m.getAttribute('#thead button[data-col="6"]', 'aria-sort'), 'ascending');
+    assert.equal(await m.getAttribute('#thead button[title="Sort by Customer"]', 'aria-sort'), 'ascending');
     await m.selectOption('#status', '');
     // Joe 11/3: edit the customer, its account number too: double-click its line for the card.
-    await m.dblclick('#rows tr[data-key="7001"] td:nth-child(8)');
+    await m.dblclick('#rows tr[data-key="7001"] td:nth-child(7)');
     await m.waitForSelector('#panel #c-account');
     await m.fill('#c-account', '7101'); await m.press('#c-account', 'Tab');
     await m.waitForSelector('#c-msg .good');

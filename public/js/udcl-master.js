@@ -17,26 +17,30 @@ const sheetRows = (X, wb, name) => { const ws = wb.Sheets[name]; return ws ? X.u
 const $ = (id) => document.getElementById(id);
 let data = null;
 
-const fixed = (v) => v ? Number(v).toFixed(6) : '';
-// Joe 11/3: only a branch is a location. A route number the master file put in its DC column shows under Route, not DC.
+// Joe 11/3: only a branch is a location (a route number the master file put in its DC column is not shown as one).
 const dcLabel = (v) => { const d = U.branchOf(v); return d ? U.dcName(d).replace(/ DC \d+$/, '') : ''; };
 const statusOf = (c) => c.inactive ? 'Inactive' : 'Active';
+// Joe 11/6: no Route, Second line, Latitude, Longitude, Match status or Coordinate source, and the list fits the screen with no
+// sideways scroll. The widths add up to 100% with the pick box (2.2%).
 // [heading, value, centred, width, cut long text]
-const COLS = [['Status', statusOf, 1, '6%'], ['DC', c => dcLabel(c.dc), 0, '7%'], ['Route', c => U.dcRoute(c.dc), 1, '4%'], ['Group', c => c.group || '', 0, '6%', 1], ['Chain', c => c.chain, 1, '3.5%'], ['Account', c => c.account, 1, '5%'], ['Customer', c => c.name, 0, '11%', 1],
-  ['Street', c => c.address, 0, '9%', 1], ['Second line', c => c.address2, 0, '4%', 1], ['City', c => c.city, 0, '7%', 1], ['State', c => c.state, 1, '3%'], ['ZIP', c => c.zip, 1, '4.5%'],
-  ['Latitude', c => c.lat && c.lon ? fixed(c.lat) : '', 1, '5%'], ['Longitude', c => c.lat && c.lon ? fixed(c.lon) : '', 1, '5%'], ['Phone', c => c.phone, 0, '6%', 1],
-  ['Match status', c => c.addressCheck || '', 0, '', 1], ['Coordinate source', c => c.gpsFrom || '', 0, '5.5%', 1]];
+const COLS = [['Status', statusOf, 1, '6.3%'], ['DC', c => dcLabel(c.dc), 0, '8.5%'], ['Group', c => c.group || '', 0, '8%', 1], ['Chain', c => c.chain, 1, '4.5%'],
+  ['Account', c => c.account, 1, '6%'], ['Customer', c => c.name, 0, '21%', 1], ['Street', c => c.address, 0, '17%', 1], ['City', c => c.city, 0, '10%', 1],
+  ['State', c => c.state, 1, '4%'], ['ZIP', c => c.zip, 1, '5%'], ['Phone', c => c.phone, 0, '7.5%', 1]];
+const colAt = (name) => COLS.findIndex(c => c[0] === name);
 const coll = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 // The Sort by box: each is a list of [column, direction]. A heading pressed sorts by it (again: the other way).
-const GROUP = 3, NAME = 6, CITY = 9;
+const GROUP = colAt('Group'), NAME = colAt('Customer'), CITY = colAt('City');
 const PRESETS = { location: [[1, 1], [NAME, 1]], name: [[NAME, 1]], city: [[CITY, 1], [NAME, 1]], status: [[0, -1], [1, 1], [NAME, 1]] };
 const DC_NUM = (c) => Number(U.branchOf(c.dc)) || 99999;
 const PAGE = 300;
 // Joe 11/3: "save the view option". The sort (a Sort by choice or the heading pressed), the location and the status stay as they
 // were left, on this computer; the screen opens with them.
 let saved = savedView('customers');
-let order = Array.isArray(saved.order) && saved.order.every(x => Array.isArray(x) && COLS[x[0]] && (x[1] === 1 || x[1] === -1)) ? saved.order : PRESETS.location, shown = PAGE;
-const remember = () => saveView('customers', { sort: $('sort').value, order, dc: $('dcpick').value, status: $('status').value });
+// The heading sort is kept by heading name, so it still means the same column when columns come and go.
+const savedOrder = Array.isArray(saved.sortBy) && saved.sortBy.length && saved.sortBy.every(x => Array.isArray(x) && colAt(x[0]) >= 0 && (x[1] === 1 || x[1] === -1)) ? saved.sortBy.map(([n, d]) => [colAt(n), d]) : null;
+if (!savedOrder && saved.sort === '') saved.sort = 'location';
+let order = savedOrder || PRESETS[saved.sort] || PRESETS.location, shown = PAGE;
+const remember = () => saveView('customers', { sort: $('sort').value, sortBy: order.map(([i, d]) => [COLS[i][0], d]), dc: $('dcpick').value, status: $('status').value });
 let rowsNow = [];                 // the customers the boxes pick, in order (drawn or not)
 const picked = new Set();         // the customers picked for Make inactive / Make active
 let anchor = null;                // where a Shift-click run starts
@@ -70,7 +74,6 @@ function rowHtml(c) {
     const v = col[1](c);
     if (i === 0) return '<td>' + statusCell(c) + '</td>';
     if (i === GROUP) return '<td class="l grp-cell">' + groupCell(c) + '</td>';
-    if (col[0] === 'Latitude' && v !== '') return '<td><a href="https://www.google.com/maps?q=' + encodeURIComponent(c.lat + ',' + c.lon) + '" target="_blank" rel="noopener" title="Open in Google Maps">' + e(v) + '</a></td>';
     return '<td' + (col[2] ? '' : ' class="l"') + (col[4] ? ' title="' + e(v) + '"' : '') + '>' + (col[0] === 'Customer' ? '<b>' + e(v) + '</b>' : col[0] === 'Street' && !v ? '<span class="warnline">No address yet</span>' : e(v)) + '</td>';
   }).join('') + '</tr>';
 }
@@ -322,7 +325,7 @@ let typing = null;
 ['q', 'dcpick', 'status'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', () => { shown = PAGE; clearTimeout(typing); if (id === 'q') typing = setTimeout(draw, 200); else { remember(); draw(); } }));
 $('rows').addEventListener('click', ev => { const m = ev.target.closest('button[data-more]'); if (m) { shown = m.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); } });
 printMenu($('udcl-print-menu'), () => !data ? [] : [{ label: 'This list, as shown', note: 'In this order, with the boxes as they are', html: () => printDoc('Master customer list',
-  [tablePage('Master customer list · ' + data.plantName, $('count').textContent, shownRows(), COLS.filter(c => !/Coordinate|Second/.test(c[0])).map(c => [c[0], c[1], c[2]]))]) }]);
+  [tablePage('Master customer list · ' + data.plantName, $('count').textContent, shownRows(), COLS.map(c => [c[0], c[1], c[2]]))]) }]);
 
 requireSignIn(async () => {
   try {
