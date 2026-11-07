@@ -86,7 +86,7 @@ async function ph0(browser) {
     assert.deepEqual(await caseCols('13590', 'Sat'), ['12', '21', '21', '30', '21']);
     assert.deepEqual(await caseCols('40121', 'Thu'), ['18', '35', '35', '52', '35']);
     assert.equal(await p.$eval('#rows tr[data-key="13590"] td.held', t => t.textContent), '46', 'the High is the number held (the standard)');
-    assert.match(await p.textContent('#imported'), /Cases: cases per delivery from 3 weeks of the Weekly Route Report/);
+    assert.match(await p.textContent('#imported'), /Cases: cases per delivery from 3 weeks of the weekly route report \(United Dairy Hub, Accounting Numbers\)/);
     await p.selectOption('#rows tr[data-key="13590"] select.uses >> nth=0', 'LAST');
     await p.waitForFunction(() => document.querySelector('#rows tr[data-key="13590"] td.held') && document.querySelector('#rows tr[data-key="13590"] td.held').textContent === '25.3');
     assert.equal((await db().collection('udclRouteDays').doc('fac_uniontown__805__THU').get()).data().palletUses['13590'], 'LAST');
