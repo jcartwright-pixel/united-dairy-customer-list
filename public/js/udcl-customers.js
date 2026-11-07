@@ -91,7 +91,7 @@ function draw() {
   } else {
     const lines = U.pick(allLines, fl);
     const grp = (l) => view === 'route' && (!$('sort').value || $('sort').value === 'route') ? 'Route ' + l.route + ' · ' + dayName(l.day) : view === 'day' && (!$('sort').value || $('sort').value === 'day') ? dayName(l.day) + ' · Route ' + l.route : '';
-    // Joe 11-6-26: each customer's cases per delivery on that route day (from the Hub's Weekly Route Report), beside the run and
+    // Joe 11-6-26: each customer's cases per delivery on that route day (from the Hub's weekly route report, read on Accounting Numbers), beside the run and
     // load sequence, and PALLET USES: the number Pallet Builder holds pallet space for (blank = the standard on Pallet Rules).
     const pr = data.palletRules || U.PALLET_RULES, std = 'Standard (' + U.CASE_RULE_NAMES[pr.standard] + ')';
     $('thead').innerHTML = '<tr><th style="width:5%">Day</th><th style="width:5%">Route</th><th style="width:5%">Run Seq</th><th style="width:5%">Load Seq</th><th style="width:7%">Account</th><th class="l" style="width:19%">Customer</th><th class="l" style="width:10%">City</th>' +
@@ -130,8 +130,8 @@ function drawFooter() {
 function casesLine() {
   const n = (data.routeDays || []).reduce((a, rd) => Math.max(a, rd.caseWeeks || 0), 0);
   if (view === 'customer' || view === 'list') return '';
-  return n ? '<span><b>Cases:</b> cases per delivery from ' + n + ' week' + (n === 1 ? '' : 's') + ' of the Weekly Route Report (United Dairy Hub). Dairy Queens are bigger in summer.</span>'
-    : '<span class="warnline"><b>Cases:</b> no weeks yet. An administrator turns on the Weekly Route Report in the United Dairy Hub.</span>';
+  return n ? '<span><b>Cases:</b> cases per delivery from ' + n + ' week' + (n === 1 ? '' : 's') + ' of the weekly route report (United Dairy Hub, Accounting Numbers). Dairy Queens are bigger in summer.</span>'
+    : '<span class="warnline"><b>Cases:</b> no weeks yet. An administrator turns on the weekly route report in the United Dairy Hub, Administration > Accounting Numbers.</span>';
 }
 const emptyText = () => data.canImport ? 'The customer list is empty. Press Upload Route Menu, or upload the master list on Customers.' : 'The customer list is empty. An administrator uploads it from the Route Menu workbook.';
 
