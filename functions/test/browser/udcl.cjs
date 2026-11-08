@@ -109,6 +109,10 @@ async function ph0(browser) {
     const m = await page(browser, EMAIL);
     await m.goto(m.emailFor('master-customers.html'));
     await m.waitForSelector('#rows tr[data-key="1196"]');
+    // Joe 11/6: with no view kept yet, it opens on Active customers of the plant's own DC (30 Uniontown). Then all of them, for the rest.
+    assert.equal(await m.inputValue('#status'), 'Active');
+    assert.equal(await m.inputValue('#dcpick'), '30');
+    await m.selectOption('#status', ''); await m.selectOption('#dcpick', '');
     assert.equal(await m.textContent('#udcl-nav a[aria-current="page"]'), 'Customers');
     assert.deepEqual(await m.$$eval('#thead th', x => x.map(t => t.textContent.trim())), ['', 'Status', 'DC ▲', 'Group', 'Chain', 'Account', 'Customer', 'Street', 'City', 'State', 'ZIP', 'Phone']);
     // Joe 11/6: every column fits, no sideways scroll.

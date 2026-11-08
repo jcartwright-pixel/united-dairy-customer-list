@@ -74,7 +74,7 @@ The **Customers** tab (administrators only): the master customer list, every cus
 6. To change many at once: click a line to pick it (click again to let go), Shift-click another line to pick every line between, or hold the mouse down and drag down the list. The box at the top of the first column picks every customer the boxes show (use **Find** for a chain or a name first). Then press `Make inactive` or `Make active` on the bar at the bottom, or pick a group in `Set group…` to put them all in it. `Clear` (or Esc) lets go of the picked lines.
 7. **Group** (before **Chain**): click a customer's group (or the empty spot) and pick its group from the list; it saves at once. `+ New group…` at the end of the list adds a group: type its name and press Enter. The Sales app groups its customers by this. Groups are renamed and removed on **Administration**, **Groups**.
 8. To edit a customer, double-click its line (anywhere but **Status**), or pick one line and press `Edit customer`. The card has every box: **Account number**, **Chain**, **Name**, **Group**, **Phone**, **Distribution center**, the address, contact, keys and notes. Each box saves when you leave it. A new account number moves the customer and its route day stops to the new number; a number another customer has is refused.
-9. The screen opens the way you left it: **Sort by** (or the heading you pressed), the location and the status are kept on this computer.
+9. The screen opens the way you left it: **Sort by** (or the heading you pressed), the location and the status are kept on this computer. The first time, it opens on **Active** customers of your own location (30 Uniontown).
 
 ### Buttons
 

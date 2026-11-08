@@ -36,6 +36,9 @@ const PAGE = 300;
 // Joe 11/3: "save the view option". The sort (a Sort by choice or the heading pressed), the location and the status stay as they
 // were left, on this computer; the screen opens with them.
 let saved = savedView('customers');
+// Joe 11/6: "the default should be only view active and the default location should be set to Uniontown". With nothing kept yet
+// (a new computer or person), the status box starts on Active and the location box on the plant's own DC (30 Uniontown).
+if (saved.status === undefined) saved.status = 'Active';
 // The heading sort is kept by heading name, so it still means the same column when columns come and go.
 const savedOrder = Array.isArray(saved.sortBy) && saved.sortBy.length && saved.sortBy.every(x => Array.isArray(x) && colAt(x[0]) >= 0 && (x[1] === 1 || x[1] === -1)) ? saved.sortBy.map(([n, d]) => [colAt(n), d]) : null;
 if (!savedOrder && saved.sort === '') saved.sort = 'location';
@@ -107,7 +110,7 @@ function drawStats() {
 
 function drawLocations() {
   const all = Object.values(data.customers), dcs = [...new Set(all.map(c => U.branchOf(c.dc)).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
-  const keep = saved ? saved.dc || '' : $('dcpick').value, none = all.some(c => !U.branchOf(c.dc));
+  const keep = saved ? (saved.dc === undefined ? U.PLANT_DC[data.plant] || '' : saved.dc || '') : $('dcpick').value, none = all.some(c => !U.branchOf(c.dc));
   $('dcpick').innerHTML = '<option value="">All locations</option>' + dcs.map(d => '<option value="' + e(d) + '">' + e((d + ' ' + dcLabel(d).replace(/^\d+\s*/, '')).trim()) + '</option>').join('') +
     (none ? '<option value="none">No branch</option>' : '');
   $('dcpick').value = dcs.includes(keep) || (keep === 'none' && none) ? keep : '';
