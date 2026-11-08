@@ -375,7 +375,7 @@ test('Joe 11/2: the company full list adds missing customers of this plant\'s DC
   assert.notEqual(v.customers['7777'].active, false);
 });
 
-test('Joe 11/2: the master file ("Replace whatever I have with this") replaces name, chain and address, adds GPS and the address check, keeps routes and groups, and clears an earlier list', async () => {
+test('Joe 11/2: the master file ("Replace whatever I have with this") replaces name, chain and address, adds GPS and the address check, keeps routes and groups; Joe 11-8-26 (Update the file): a customer the file does not have is never removed', async () => {
   const H = ['DC', 'Chain', 'Account', 'Customer', 'Original street', 'Original second line', 'Original city', 'Original state', 'Original ZIP', 'Matched address', 'Address changed?', 'Latitude', 'Longitude', 'Match status', 'Match quality', 'Coordinate source', 'Change details', 'Review notes'];
   const first = U.fullListRows([['DC', 'CHAIN', 'ACCOUNT', 'NAME'], [30, 0, 8888, 'OLD LIST STORE', '1 GONE RD', '', 'NOWHERE', 'PA', 15401]]);
   const rows = U.fullListRows([H,
@@ -390,9 +390,10 @@ test('Joe 11/2: the master file ("Replace whatever I have with this") replaces n
   await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows: first }, now);
   await S.udclCall(db, boss, PLANT, { op: 'saveCustomer', key: '5002', fields: { group: "Best's Stores", phone: '555-0100' } }, now);
   const out = await S.udclCall(db, boss, PLANT, { op: 'importFullList', rows }, now);
-  assert.equal(out.counts.removed, 1);
+  assert.equal(out.counts.removed, 0);
+  assert.match(out.message, /Nobody was removed/);
   const v = await S.udclCall(db, boss, PLANT, { op: 'view' });
-  assert.equal(v.customers['8888'], undefined, 'a customer only on the earlier list, with no route, is gone');
+  assert.equal(v.customers['8888'].name, 'OLD LIST STORE', 'a customer only on the earlier list stays as it is');
   const c = v.customers['5002'];
   assert.deepEqual([c.name, c.chain, c.lat, c.addressCheck, c.group, c.phone], ['BEST FOODS #2 MAPLETON', '415', 40.1, 'Street address matched', "Best's Stores", '555-0100']);
   assert.ok(v.routeDays.some(rd => (rd.stops || []).some(s => s.key === '5002')), 'routes are kept');

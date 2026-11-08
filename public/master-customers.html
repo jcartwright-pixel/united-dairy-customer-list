@@ -17,7 +17,8 @@
      Joe 11/3: "get rid of the garbage ... I have more usable room for the list." One slim bar on top (title, the boxes, Upload,
      Print), the list fills the rest, the totals sit in one line at the bottom, and the upload opens in its own box.
      Joe 11/3: double-click a status to switch it; pick rows (click, Shift-click, drag) and Make inactive / Make active.
-     Joe 11/3: its own tab, Customers (out of Administration); the group is set here, in the Group column before Chain. -->
+     Joe 11/3: its own tab, Customers (out of Administration); the group is set here, in the Group column before Chain.
+     Joe 11-8-26: "It doesn't replace the file. It just updates the file." The button is Update the file and it never removes a customer. -->
 <body class="fill udcl-page ml-page" data-help="master-customers">
   <div class="signin" id="signin" hidden>
     <h1>Customers</h1>
@@ -44,7 +45,7 @@
         <select id="dcpick" aria-label="Location"><option value="">All locations</option></select>
         <select id="status" aria-label="Status"><option value="">Active and inactive</option><option>Active</option><option>Inactive</option></select>
         <span class="ml-count" id="count"></span>
-        <button type="button" class="ml-upload" id="upload-open">Upload master list</button>
+        <button type="button" class="ml-upload" id="upload-open">Update the file</button>
         <span id="udcl-print-menu"></span>
       </div>
       <div class="scroll-list ml-table" id="table-wrap">
@@ -60,19 +61,19 @@
 
   <div class="udcl-modal ml-modal" id="upload-box" hidden role="dialog" aria-modal="true" aria-labelledby="upload-title">
     <div class="box">
-      <header><h2 id="upload-title">Upload the master address list</h2><button type="button" id="upload-close">Close</button></header>
+      <header><h2 id="upload-title">Update the file</h2><button type="button" id="upload-close">Close</button></header>
       <div class="ml-modal-body">
         <label class="ml-file">Pick the file (.xlsx, .csv or .txt)<input type="file" id="i-addr" accept=".xlsx,.xls,.xlsb,.csv,.txt,.tsv"></label>
         <div id="i-msg"></div>
-        <details><summary>What an upload changes</summary><ul>
+        <details><summary>What an update changes</summary><ul>
           <li>The file needs <b>DC, Chain, Account, Customer</b> and the street, city, state and ZIP. <b>Status</b> (Active or Inactive), <b>Latitude, Longitude, Phone, Contact, Group, Match status, Matched address</b> and <b>Coordinate source</b> are read when they are there.</li>
           <li><b>Changes</b> each customer's name, chain, distribution center and address, and the GPS, phone, contact, group and status the file has. <b>Adds</b> a customer the list does not have yet (with no route).</li>
           <li><b>Keeps</b> routes, run and load order, notes, keys, anything the file leaves blank, and a checked ship-to address. A PO box, mailbox or c/o never replaces a street.</li>
-          <li><b>Removes</b> a customer from an earlier master list that this one no longer has, only if it is on no route and the file is the whole list.</li>
+          <li><b>Never removes</b> anyone: a customer the file does not have stays exactly as it is. The file can be the whole list or only the changes.</li>
           <li>A sheet of checked ship-to addresses (Account, Street, City, State, Zip) goes in with the same button.</li>
         </ul></details>
       </div>
-      <footer><span></span><button type="button" class="primary" id="i-addr-go">Upload</button></footer>
+      <footer><span></span><button type="button" class="primary" id="i-addr-go">Update the file</button></footer>
     </div>
   </div>
 
