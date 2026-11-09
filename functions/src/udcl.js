@@ -776,8 +776,9 @@ async function changeAccount(db, plant, email, input, stamp) {
  * customers only (Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system"). Route Cost's server reads
  * that record and never writes it. Rows: { route, day (0 = Sunday, as Route Cost's print), dayName, stop (1, 2, 3 ... after
  * inactive ones are left out), load (load sequence, 0 = none), account, chain, customer }. sourceAt is the newest change to the
- * plant's customers or route days; the record is rewritten after every change made here, and whenever the Customers screen opens
- * and finds it behind (a route day saved from Operations' Pallet Builder, say).
+ * plant's customers or route days (the list is as of then); the record is rewritten after every change made here, and whenever the Customers screen opens
+ * and finds it behind (a route day saved from Operations' Pallet Builder, say). A signed-in screen can ask the one call for the
+ * same rows: customerList { op: 'routeMaster', plant }.
  */
 const ROUTE_MASTER = 'udclRouteMaster';
 function newestChange(d) {
@@ -801,7 +802,7 @@ function routeMasterOf(plant, d) {
     });
   });
   const routes = new Set(rows.map(r => r.route)), routeDays = new Set(rows.map(r => r.route + '|' + r.day));
-  return { plant, plantName: plantName(plant), sourceAt: newestChange(d), counts: { stops: rows.length, routes: routes.size, routeDays: routeDays.size, inactiveLeftOut: left }, rows };
+  return { plant, plantName: plantName(plant), activeOnly: true, sourceAt: newestChange(d), counts: { stops: rows.length, routes: routes.size, routeDays: routeDays.size, inactiveLeftOut: left }, rows };
 }
 /**
  * Writes the plant's Route Master record. d = readPlant's answer, before inactive ones are taken out. With known (the record as
@@ -838,6 +839,8 @@ async function udclCall(db, who, plant, input, deps) {
   if (L.plantsFor(person).indexOf(plant) < 0) fail('NOT_ALLOWED', 'You are not set up for ' + plantName(plant) + '.');
   if (op === 'view') return view(db, plant, person, Object.assign({}, input, { rights: r }));
   if (op === 'routeBook') return routeBook(db, plant, input.route, input.day);
+  // The bridge to Route Cost, asked through the one call: the same rows the udclRouteMaster record holds, read fresh.
+  if (op === 'routeMaster') return Object.assign({ ok: true }, routeMasterOf(plant, await readPlant(db, plant)));
   const fn = OPS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Customer List step: ' + op);
   if (!r[NEEDS[op]]) fail('NOT_ALLOWED', NEEDS[op] === 'importList' ? 'Only an administrator can import the customer list (or someone allowed it in the United Dairy Hub, People & Access).' : 'Only an Administrator or Manager can change the customer list and route sequence (or someone allowed it in the United Dairy Hub, People & Access).');

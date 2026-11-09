@@ -98,3 +98,11 @@ test('speed: the full 5,118-customer list builds its Route Master record quickly
   assert.ok(ms < 200, 'took ' + ms + ' ms');
   assert.ok(Buffer.byteLength(JSON.stringify(rm)) < 900000, 'fits in one database record');
 });
+
+test('the one call answers routeMaster with the same rows, for anyone who may see the plant', async () => {
+  const db = await imported();
+  const out = await S.udclCall(db, mgr, PLANT, { op: 'routeMaster' });
+  assert.equal(out.activeOnly, true);
+  assert.deepEqual(out.rows, record(db).rows);
+  assert.ok(!db.docs.has('udclLog/none') && out.counts.stops === 5);
+});
