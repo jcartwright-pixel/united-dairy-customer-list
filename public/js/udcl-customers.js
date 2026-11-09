@@ -155,7 +155,7 @@ function openImport() {
     '<label>Route Menu workbook (.xlsb, .xlsx)<input type="file" id="i-menu" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<label>Route Book workbook (optional)<input type="file" id="i-book" accept=".xlsx,.xlsb,.xls,.xlsm"></label>' +
     '<button type="button" class="primary" id="i-go">Upload</button><div id="i-msg"></div>' +
-    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on <b>Customers</b>, Upload master list.</p><hr>' +
+    '<p class="deliveries">The master list (addresses, GPS, phones) is uploaded on <b>Customers</b>, Update the file.</p><hr>' +
     '<p>No workbook at hand? Bring over the list already uploaded for the Sales app (no load sequence or addresses).</p><button type="button" id="i-sales">Bring over the Sales app list</button><hr>' +
     '<p class="deliveries">A new upload overrules what was changed here: whatever the workbooks have wins. What they do not have stays as typed (phones, contacts, notes, stop notes, and the run order and load maps when no Route Book is picked). Changes made here stay until the next upload. A route day no longer in the Route Menu is removed.</p>');
   const say = (t, cls) => { $('i-msg').innerHTML = t ? '<div class="msg ' + (cls || '') + '">' + e(t) + '</div>' : ''; };
@@ -167,7 +167,7 @@ function openImport() {
       const X = await loadXlsx(), wb = X.read(await mf.arrayBuffer(), { type: 'array' });
       const tab = findSheet(wb, 'Customer By Route');
       const menu = tab ? U.menuStops(sheetRows(X, wb, tab)) : null;
-      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on Customers, Upload master list.', 'bad');
+      if (!menu || !menu.stops.length) return say('No "Customer By Route" tab with Day, Route and Name headings was found in ' + mf.name + '. This box takes only the Route Menu workbook: the master address list goes in on Customers, Update the file.', 'bad');
       const accounts = new Set(menu.stops.concat(menu.unrouted).map(s => s.account).filter(Boolean)), names = new Set(menu.stops.concat(menu.unrouted).map(s => U.nameKey(s.name)));
       const at = findSheet(wb, 'Address List'), gt = findSheet(wb, 'GPS Address');
       const allAddr = at ? U.addressList(sheetRows(X, wb, at)) : {}, allGps = gt ? U.gpsAddresses(sheetRows(X, wb, gt)) : {};
