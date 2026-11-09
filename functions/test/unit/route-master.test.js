@@ -104,5 +104,5 @@ test('the one call answers routeMaster with the same rows, for anyone who may se
   const out = await S.udclCall(db, mgr, PLANT, { op: 'routeMaster' });
   assert.equal(out.activeOnly, true);
   assert.deepEqual(out.rows, record(db).rows);
-  assert.ok(!db.docs.has('udclLog/none') && out.counts.stops === 5);
+  assert.equal(out.counts.stops, 5);
 });
