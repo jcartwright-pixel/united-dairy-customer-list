@@ -89,8 +89,10 @@ async function readPlant(db, plant) {
 
 /** What every screen gets: the plant's customers and route days, and what this person may change. */
 async function view(db, plant, person, opts) {
-  const [d, rules] = await Promise.all([readPlant(db, plant), db.collection('private').doc(RULES_DOC + plant).get()]);
+  const [d, rules, rm] = await Promise.all([readPlant(db, plant), db.collection('private').doc(RULES_DOC + plant).get(), db.collection(ROUTE_MASTER).doc(safeIdPart(plant)).get()]);
   const r = (opts && opts.rights) || rightsOf(person);
+  // The Route Master record Route Cost reads: brought up to date if a change reached the list some other way.
+  if (d.meta) await publishRouteMaster(db, plant, d, new Date().toISOString(), rm);
   // Joe 11-6-26: each customer's cases on each route day, from the Hub's Weekly Route Report, for the screens that show them.
   if (opts && opts.cases) await addCases(db, d.routeDays);
   // Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system." Only the Master Customer List (an
@@ -760,6 +762,55 @@ async function changeAccount(db, plant, email, input, stamp) {
   return { ok: true, customer: after, oldKey: key, routeDays, message: before.name + ' has account ' + after.account + ' now' + (on.length ? ', on ' + on.join(', ') : '') + '.' };
 }
 
+/*
+ * Joe 11-8-26 / 11-9-26 ("start that bridge now"): Route Cost Analysis reads the Route Master from here instead of its frozen 11-8-26
+ * print. This app writes one record per plant, udclRouteMaster/<plant>: every stop on every route day, in run order, active
+ * customers only (Joe 11/2: "If it is inactive, then it's not showing anywhere else in our system"). Route Cost's server reads
+ * that record and never writes it. Rows: { route, day (0 = Sunday, as Route Cost's print), dayName, stop (1, 2, 3 ... after
+ * inactive ones are left out), load (load sequence, 0 = none), account, chain, customer }. sourceAt is the newest change to the
+ * plant's customers or route days (the list is as of then); the record is rewritten after every change made here, and whenever the Customers screen opens
+ * and finds it behind (a route day saved from Operations' Pallet Builder, say). A signed-in screen can ask the one call for the
+ * same rows: customerList { op: 'routeMaster', plant }.
+ */
+const ROUTE_MASTER = 'udclRouteMaster';
+function newestChange(d) {
+  let at = '';
+  d.routeDays.forEach(r => { if ((r.updatedAt || '') > at) at = r.updatedAt; });
+  Object.keys(d.customers).forEach(k => { const u = d.customers[k].updatedAt || ''; if (u > at) at = u; });
+  return at;
+}
+function routeMasterOf(plant, d) {
+  const rows = [];
+  let left = 0;
+  d.routeDays.forEach(rd => {
+    const day = U.dayIndex(rd.day);
+    if (day > 6) return;
+    let stop = 0;
+    (rd.stops || []).forEach(s => {
+      const c = d.customers[s.key];
+      if (!c || c.inactive || c.active === false) { left++; return; }
+      rows.push({ route: String(rd.route), day, dayName: rd.day, stop: ++stop, load: Number(s.loadSeq) || 0, account: String(c.account || s.account || ''),
+        chain: String(c.chain === undefined || c.chain === null ? (s.chain || '') : c.chain), customer: c.name || s.name || '' });
+    });
+  });
+  const routes = new Set(rows.map(r => r.route)), routeDays = new Set(rows.map(r => r.route + '|' + r.day));
+  return { plant, plantName: plantName(plant), activeOnly: true, sourceAt: newestChange(d), counts: { stops: rows.length, routes: routes.size, routeDays: routeDays.size, inactiveLeftOut: left }, rows };
+}
+/**
+ * Writes the plant's Route Master record. d = readPlant's answer, before inactive ones are taken out. With known (the record as
+ * read), only when it is missing or behind; without it (after a change made here), always.
+ */
+async function publishRouteMaster(db, plant, d, stamp, known) {
+  const ref = db.collection(ROUTE_MASTER).doc(safeIdPart(plant));
+  const rm = routeMasterOf(plant, d);
+  if (known && known.exists) {
+    const w = known.data() || {};
+    if (w.sourceAt === rm.sourceAt && JSON.stringify(w.counts || {}) === JSON.stringify(rm.counts)) return false;
+  }
+  await ref.set(Object.assign(rm, { builtAt: stamp }));
+  return true;
+}
+
 const OPS = { setPalletUses, savePalletRules, changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
 const NEEDS = { setPalletUses: 'edit', savePalletRules: 'edit', changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
 
@@ -780,11 +831,15 @@ async function udclCall(db, who, plant, input, deps) {
   if (L.plantsFor(person).indexOf(plant) < 0) fail('NOT_ALLOWED', 'You are not set up for ' + plantName(plant) + '.');
   if (op === 'view') return view(db, plant, person, Object.assign({}, input, { rights: r }));
   if (op === 'routeBook') return routeBook(db, plant, input.route, input.day);
+  // The bridge to Route Cost, asked through the one call: the same rows the udclRouteMaster record holds, read fresh.
+  if (op === 'routeMaster') return Object.assign({ ok: true }, routeMasterOf(plant, await readPlant(db, plant)));
   const fn = OPS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Customer List step: ' + op);
   if (!r[NEEDS[op]]) fail('NOT_ALLOWED', NEEDS[op] === 'importList' ? 'Only an administrator can import the customer list (or someone allowed it in the United Dairy Hub, People & Access).' : 'Only an Administrator or Manager can change the customer list and route sequence (or someone allowed it in the United Dairy Hub, People & Access).');
   const stamp = ((deps && deps.now) ? deps.now() : new Date()).toISOString();
   const out = await fn(db, plant, email, input, stamp);
+  // Every change made here also brings Route Cost's Route Master record up to date (active customers only).
+  if (!input.thenView) await publishRouteMaster(db, plant, await readPlant(db, plant), stamp);
   return Object.assign(out, input.thenView ? await view(db, plant, person, Object.assign({}, input, { rights: r })) : {});
 }
 
@@ -801,4 +856,4 @@ async function salesRows(db, plant) {
   return { rows, savedAt: at };
 }
 
-module.exports = { addCases, setPalletUses, savePalletRules, udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
+module.exports = { routeMasterOf, publishRouteMaster, ROUTE_MASTER, addCases, setPalletUses, savePalletRules, udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };

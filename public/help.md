@@ -119,6 +119,8 @@ One route on one day, its stops in the order the driver runs them. This is where
 
 > A stop added to a day goes in by its load sequence (after the stops with the same or a higher number). Drag it if it belongs somewhere else.
 
+> Route Cost Analysis reads its routes, days, run order and load sequence from this list, active customers only. A change here reaches it at once.
+
 > After you change a sequence, print the office sheet from the `Print` menu so the office has it. The drivers' phones show the new order at once. This screen, Truck Load Map and the drivers' phones all show the same route days, so a change on one shows on the others.
 
 !> Do not untick a day to move a customer to another route: unticking only takes it off this route. Use **Move to another route** instead.
