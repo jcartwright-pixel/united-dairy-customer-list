@@ -467,10 +467,10 @@ async function importAddresses(db, plant, email, input, stamp) {
 
 /**
  * Joe 11/2: "The full list can be uploaded if the customer is not showing on there. It needs to be added." and, with the master
- * file, "Replace whatever I have with this." The company's full customer list (every distribution center; fullListRows) is the
+ * file, "Replace whatever I have with this." (Joe 11-8-26: "It doesn't replace the file. It just updates the file": nothing is removed.) The company's full customer list (every distribution center; fullListRows) is the
  * master: each customer in it gets its name, chain, distribution center and address from it (never a PO box, mailbox or c/o in
  * place of a street), its GPS when the file has one, and the file's address check. A customer missing here is added with no route.
- * A customer that came from an earlier full list, is not in this one and is on no route is removed. What the file does not have
+ * A customer the file does not have stays as it is. What the file does not have
  * stays: routes, groups, phones, notes. Keys: Uniontown's own DC by account (as the Route Menu); another DC as D<dc>-<account>.
  * Account numbers repeat inside a DC under different chains: the one whose chain matches the customer already here keeps the
  * plain key, the others get -C<chain> (and -2, -3 if even that repeats).
@@ -500,7 +500,7 @@ async function importFullList(db, plant, email, input, stamp) {
     first.key = k; used.add(k);
     list.filter(x => x !== first).forEach(x => { let key = k + '-C' + (x.chain || '0'), n = 2; while (used.has(key)) key = k + '-C' + (x.chain || '0') + '-' + n++; x.key = key; used.add(key); });
   });
-  let added = 0, changed = 0, same = 0, removed = 0, gps = 0;
+  let added = 0, changed = 0, same = 0, gps = 0;
   const writes = [];
   clean.forEach(x => {
     const r = x.r, key = x.key, before = now.customers[key] || null;
@@ -530,15 +530,8 @@ async function importFullList(db, plant, email, input, stamp) {
     after.updatedAt = stamp; after.updatedBy = email;
     writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), before, after]);
   });
-  // A customer from an earlier full list that this one no longer has, and that is on no route, goes.
-  // Only a whole list clears the old one: a file much smaller than the list here (a part of it, a wrong sheet) removes nothing.
-  const listedNow = Object.values(now.customers).filter(c => c.onCompanyList).length, whole = clean.length >= listedNow * 0.8;
-  Object.keys(now.customers).forEach(key => {
-    const c = now.customers[key];
-    if (!whole || !c.onCompanyList || used.has(key) || onRoute.has(key)) return;
-    removed++;
-    writes.push(['delete', db.collection(CUSTOMERS).doc(U.customerId(plant, key)), c, null]);
-  });
+  // Joe 11-8-26: "It doesn't replace the file. It just updates the file." An upload adds and updates; it never removes a
+  // customer (one the file does not have stays as it is), the same way the Pallet Builder and Route Cost write to the list.
   for (let i = 0; i < writes.length; i += 200) {
     const batch = db.batch();
     writes.slice(i, i + 200).forEach(([what, ref, before, after]) => {
@@ -548,11 +541,10 @@ async function importFullList(db, plant, email, input, stamp) {
     await batch.commit();
   }
   const other = clean.filter(x => x.dc !== dc).length, skipped = all.length - clean.length;
-  const counts = { read: clean.length, added, changed, same, removed, gps, otherDc: other, skipped };
+  const counts = { read: clean.length, added, changed, same, removed: 0, gps, otherDc: other, skipped };
   // The Master List tab shows the last upload (Joe 11/2).
   await db.collection('private').doc('udcl_' + plant).set({ master: { at: stamp, by: email, fileName: U.text(input.fileName, 200), counts } }, { merge: true });
-  return { ok: true, counts, message: clean.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added, ' + changed + ' updated, ' + same + ' already right' +
-    (removed ? ', ' + removed + ' from an earlier list removed' : '') + '. ' + gps + ' have GPS. Routes and notes were kept, and a phone or group the file leaves blank stays as it is here.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
+  return { ok: true, counts, message: clean.length + ' customers read (' + other + ' of other distribution centers): ' + added + ' added, ' + changed + ' updated, ' + same + ' already right. Nobody was removed. ' + gps + ' have GPS. Routes and notes were kept, and a phone or group the file leaves blank stays as it is here.' + (skipped ? ' ' + skipped + ' rows with no account were skipped.' : '') };
 }
 
 /**

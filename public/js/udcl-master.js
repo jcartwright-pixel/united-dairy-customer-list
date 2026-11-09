@@ -90,7 +90,7 @@ function draw() {
     (head[0] === i ? ' aria-sort="' + (head[1] > 0 ? 'ascending' : 'descending') + '"' : '') + ' title="Sort by ' + e(c[0]) + '">' + e(c[0]) + '<span class="arrow">' + (head[0] === i ? (head[1] > 0 ? ' &#9650;' : ' &#9660;') : '') + '</span></button></th>').join('') + '</tr>';
   $('rows').innerHTML = rowsNow.slice(0, shown).map(rowHtml).join('') + (rowsNow.length > shown ? '<tr class="more"><td colspan="' + width + '">Showing ' + shown.toLocaleString() + ' of ' + rowsNow.length.toLocaleString() +
     ' &nbsp; <button type="button" data-more="1">Show ' + Math.min(PAGE, rowsNow.length - shown) + ' more</button> <button type="button" data-more="all">Show all</button></td></tr>' : '') ||
-    '<tr><td colspan="' + width + '" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : 'No customers yet. Press Upload master list.') + '</td></tr>';
+    '<tr><td colspan="' + width + '" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : 'No customers yet. Press Update the file.') + '</td></tr>';
   drawCount(); drawPicked();
 }
 
