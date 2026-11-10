@@ -51,6 +51,7 @@
 .seq-days button[aria-pressed="true"] { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
 .seq-days button:disabled { color: #b3bfcb; background: #f3f6f9; cursor: default; }
 .udcl-page td input.seq { width: 64px; text-align: center; font: inherit; font-weight: 700; border: 1px solid var(--line); border-radius: 6px; height: 28px; }
+.udcl-page td .sw { display: inline-block; min-width: 34px; border-radius: 5px; font-weight: 800; }
 .udcl-page td input.note { width: 100%; font: inherit; font-weight: 500; border: 1px solid var(--line); border-radius: 6px; height: 28px; padding: 0 6px; }
 .udcl-page td .mv { border: 1px solid var(--line); background: #fff; color: var(--ud-blue); border-radius: 6px; width: 30px; height: 28px; cursor: pointer; font: inherit; }
 .udcl-page td .rm { border: 1px solid #f1b4ae; background: #fff; color: #b42318; border-radius: 6px; height: 28px; padding: 0 8px; cursor: pointer; font: inherit; font-size: 14px; }
