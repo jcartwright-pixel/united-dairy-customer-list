@@ -70,10 +70,13 @@ async function ph0(browser) {
     await p.goto(p.emailFor('customers.html'));
     await p.waitForSelector('#rows tr[data-key="1196"]');
     assert.equal(await p.textContent('#count'), '9 customers');
-    // Joe 11/3: this screen is Routes. Chain, Account, Customer, DC, then Sun..Sat holding that day's route (no address, no group).
+    // Joe 11/3: this screen is Routes. Chain, Account, Customer, DC (no address, no group). Joe 11-10-26: then the Route in its own
+    // box and a tick for each day, Sun..Sat, one line per customer and route.
     assert.equal(await p.textContent('.head h1'), 'Routes');
-    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Chain', 'Account', 'Customer', 'DC', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] td', x => x.slice(1).map(t => t.textContent)), ['1196', 'ACORN CORNER MARKET', 'Uniontown', '', '', '803', '', '', '803', '']);
+    assert.deepEqual(await p.$$eval('#thead th', x => x.map(t => t.textContent)), ['Chain', 'Account', 'Customer', 'DC', 'Route', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] td', x => x.slice(1, 4).map(t => t.textContent)), ['1196', 'ACORN CORNER MARKET', 'Uniontown']);
+    assert.equal(await p.inputValue('#rows tr[data-key="1196"] input.rt'), '803');
+    assert.deepEqual(await p.$$eval('#rows tr[data-key="1196"] input:checked', x => x.map(i => i.value)), ['TUE', 'FRI']);
     await shot(p, 'udcl-1920-customers');
     await p.click('#views [data-view="route"]');
     await p.selectOption('#route', '805');
@@ -396,6 +399,56 @@ async function ph0(browser) {
     await win.press('#rows input.lm-seq[data-i="0"]', 'Tab');
     await q.waitForFunction((k) => { const r = document.querySelector('#rows tr[data-drag="' + k + '"] input.seq'); return r && r.value === '12'; }, first, { timeout: 10000 });
     await shot(win, 'udcl-load-map-window');
+
+    // Joe 11-10-26: on Routes, By Customer, tick the days and change the route right on the line; each change saves by itself.
+    const rc = await page(browser, EMAIL, { width: 1366, height: 768 });
+    await rc.goto(rc.emailFor('customers.html?view=customer'));
+    await rc.waitForSelector('#rows tr[data-key="1196"] input.rt');
+    const rd = async (route, day) => { const d = await db().collection('udclRouteDays').doc('fac_uniontown__' + route + '__' + day).get(); return d.exists ? d.data().stops.map(x => x.key) : []; };
+    const until = async (fn) => { for (let i = 0; i < 80 && !(await fn()); i++) await new Promise(r => setTimeout(r, 100)); assert.ok(await fn()); };
+    // It fits the screen: no sideways scroll at 1366 or 1280.
+    assert.ok(await rc.$eval('#table-wrap', w => w.scrollWidth <= w.clientWidth), 'By Customer scrolls sideways at 1366');
+    assert.ok(await rc.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'the page scrolls sideways at 1366');
+    await shot(rc, 'udcl-1366-by-customer-edit');
+    // Tick Wednesday: ACORN CORNER MARKET goes on route 803 Wednesday. Untick it: it comes off.
+    await rc.check('#rows tr[data-key="1196"][data-route="803"] input[value="WED"]');
+    await until(async () => (await rd('803', 'WED')).includes('1196'));
+    await rc.waitForSelector('#rows tr[data-key="1196"][data-route="803"]:not(.saving) input[value="WED"]:checked');
+    await rc.uncheck('#rows tr[data-key="1196"][data-route="803"] input[value="WED"]');
+    await until(async () => !(await rd('803', 'WED')).includes('1196'));
+    // A new route number moves every ticked day: QUICK STOP *COD* from 803 to 806 (a new route), then back.
+    await rc.fill('#rows tr[data-key="1984"] input.rt', '806');
+    await rc.press('#rows tr[data-key="1984"] input.rt', 'Enter');
+    await until(async () => (await rd('806', 'TUE')).includes('1984') && !(await rd('803', 'TUE')).includes('1984'));
+    await rc.waitForSelector('#rows tr[data-key="1984"][data-route="806"] input[value="TUE"]:checked');
+    // A route that is not a number is turned down and the box goes back.
+    await rc.fill('#rows tr[data-key="1984"] input.rt', 'ABC');
+    await rc.press('#rows tr[data-key="1984"] input.rt', 'Enter');
+    assert.match(await rc.textContent('#error'), /A route is a number/);
+    assert.equal(await rc.inputValue('#rows tr[data-key="1984"] input.rt'), '806');
+    await rc.fill('#rows tr[data-key="1984"] input.rt', '803');
+    await rc.press('#rows tr[data-key="1984"] input.rt', 'Enter');
+    await until(async () => (await rd('803', 'TUE')).includes('1984') && !(await rd('806', 'TUE')).includes('1984'));
+    await rc.waitForSelector('#rows tr[data-key="1984"][data-route="803"]');
+    assert.equal(await rc.isHidden('#error'), true);
+    // A customer on no route: type the route, then tick a day; it goes on. Untick it and it is on no route again.
+    await rc.fill('#rows tr[data-key="7101"] input.rt', '805');
+    await rc.press('#rows tr[data-key="7101"] input.rt', 'Enter');
+    await rc.check('#rows tr[data-key="7101"] input[value="SUN"]');
+    await until(async () => (await rd('805', 'SUN')).includes('7101'));
+    await rc.waitForSelector('#rows tr[data-key="7101"][data-route="805"]:not(.saving) input[value="SUN"]:checked');
+    await rc.uncheck('#rows tr[data-key="7101"] input[value="SUN"]');
+    await until(async () => !(await rd('805', 'SUN')).includes('7101'));
+    await rc.waitForSelector('#rows tr[data-key="7101"][data-route=""]');
+    await rc.setViewportSize({ width: 1280, height: 720 });
+    assert.ok(await rc.$eval('#table-wrap', w => w.scrollWidth <= w.clientWidth), 'By Customer scrolls sideways at 1280');
+    // A dispatcher sees the ticks but cannot change them.
+    const vc = await page(browser, VIEWER, { width: 1366, height: 650 });
+    await vc.goto(vc.emailFor('customers.html?view=customer'));
+    await vc.waitForSelector('#rows tr[data-key="1196"]');
+    assert.equal(await vc.$$eval('#rows input.rt', x => x.length), 0);
+    assert.equal(await vc.$$eval('#rows input[type="checkbox"]:not(:disabled)', x => x.length), 0);
+    assert.equal(await vc.textContent('#rows tr[data-key="1196"] td:nth-child(5)'), '803');
 
     // Joe 11/1: "want to downloadable app": every page names the app's manifest, and its icons are there.
     await ph0(browser);
