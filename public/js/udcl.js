@@ -100,6 +100,8 @@ export function printMenu(box, items) {
 
 const PRINT_CSS = `
   @page { size: letter; margin: 0.45in; }
+  @page land { size: letter landscape; margin: 0.45in; }
+  .land { page: land; }
   * { box-sizing: border-box; }
   body { font: 12px/1.25 Arial, Helvetica, sans-serif; color: #000; margin: 0; }
   h1 { font-size: 18px; margin: 0 0 2px; }
@@ -150,16 +152,17 @@ export function routeDayPage(rd, customers, kind, plantName) {
   const table = '<table>' + head + rows + '</table>';
   const notes = rd.notes ? '<div class="notes"><b>Instructions</b>\n' + e(rd.notes) + '</div>' : '';
   const body = driver ? '<div class="two"><div>' + table + notes + '</div><div>' + truckHtml(rd.map) + '</div></div>' : table + notes;
-  return '<h1>' + title + '</h1><p class="sub">' + e(plantName || '') + ' · ' + (driver ? 'Route book' : 'Route sequence') + ' · ' + stops.length + ' stops · ' + changed(rd) + '</p>' + body +
-    '<p class="foot">' + printedOn() + '</p>';
+  // Joe 11-10-26: the sequence prints come out in landscape.
+  return '<section class="land"><h1>' + title + '</h1><p class="sub">' + e(plantName || '') + ' · ' + (driver ? 'Route book' : 'Route sequence') + ' · ' + stops.length + ' stops · ' + changed(rd) + '</p>' + body +
+    '<p class="foot">' + printedOn() + '</p></section>';
 }
 
 /** The load map with the customer list beside it (what the kiosk shows). */
 export function loadMapPage(rd, customers, plantName) {
   const rows = (rd.stops || []).map((s, i) => { const c = customers[s.key] || {}; return '<tr><td class="c">' + (i + 1) + '</td><td class="c"><span class="sw" style="background:' + seqColour(s.loadSeq) + '">' + (s.loadSeq || '') + '</span></td><td><b>' + e(c.name || s.name) + '</b></td><td>' + e(s.note || '') + '</td></tr>'; }).join('');
-  return '<h1>Truck load map · Route ' + e(rd.route) + ' · ' + e(U.DAY_NAMES[rd.day] || rd.day) + '</h1><p class="sub">' + e(plantName || '') + ' · Load 1 goes on first, at the front · ' + changed(rd) + '</p>' +
+  return '<section class="land"><h1>Truck load map · Route ' + e(rd.route) + ' · ' + e(U.DAY_NAMES[rd.day] || rd.day) + '</h1><p class="sub">' + e(plantName || '') + ' · Load 1 goes on first, at the front · ' + changed(rd) + '</p>' +
     '<div class="two" style="grid-template-columns:auto 1fr"><div>' + truckHtml(rd.map) + '</div><div><table><tr><th class="c">Run Seq</th><th class="c">Load Seq</th><th>Customer</th><th>Notes</th></tr>' + rows + '</table>' +
-    (rd.notes ? '<div class="notes"><b>Instructions</b>\n' + e(rd.notes) + '</div>' : '') + '</div></div><p class="foot">' + printedOn() + '</p>';
+    (rd.notes ? '<div class="notes"><b>Instructions</b>\n' + e(rd.notes) + '</div>' : '') + '</div></div><p class="foot">' + printedOn() + '</p></section>';
 }
 
 /** Any list of lines as a printed table: cols = [[heading, (line) => text, 'c' to centre]]; group = (line) => heading or ''. */

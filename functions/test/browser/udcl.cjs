@@ -266,7 +266,13 @@ async function ph0(browser) {
     const ref = db().collection('udclRouteDays').doc('fac_uniontown__805__THU');
     for (let i = 0; i < 50 && (await ref.get()).data().stops[0].key !== '1707'; i++) await new Promise(r => setTimeout(r, 100));
     assert.deepEqual((await ref.get()).data().stops.map(x => x.key), ['1707', '40121', '13590']);
+    // Joe 11-10-26: each Load Seq box has the colour of its number on the truck load map.
+    const seqBg = async (i) => s.$eval('#rows input.seq[data-i="' + i + '"]', x => getComputedStyle(x).backgroundColor);
+    const mapBg = async (n) => s.$$eval('#map .lm-cell', (x, n) => { const c = x.find(y => y.textContent.trim() === String(n)); return c ? getComputedStyle(c).backgroundColor : ''; }, n);
+    const seq0 = await s.inputValue('#rows input.seq[data-i="0"]');
+    if (await mapBg(seq0)) assert.equal(await seqBg(0), await mapBg(seq0), 'load ' + seq0 + ' is the same colour in the list and on the map');
     await s.fill('#rows input.seq[data-i="2"]', '9');
+    assert.equal(await seqBg(2), 'rgb(176, 190, 197)', 'load 9 takes its map colour as it is typed');
     await s.press('#rows input.seq[data-i="2"]', 'Tab');
     for (let i = 0; i < 50 && (await ref.get()).data().stops[2].loadSeq !== 9; i++) await new Promise(r => setTimeout(r, 100));
     assert.equal((await ref.get()).data().stops[2].loadSeq, 9);
@@ -280,6 +286,7 @@ async function ph0(browser) {
     await v.goto(v.emailFor('route-sequence.html?route=805&day=THU'));
     await v.waitForSelector('#rows tr[data-drag]');
     assert.equal(await v.$$eval('#rows input', x => x.length), 0);
+    assert.ok((await v.$$eval('#rows td .sw', x => x.length)) > 0, 'a dispatcher sees the coloured load sequence');
     assert.match(await v.textContent('#hint'), /Only an Administrator or Manager/);
 
     // Truck Load Map: paint a spot with load 9.

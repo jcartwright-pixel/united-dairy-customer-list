@@ -5,7 +5,7 @@
 // driver's route book page, or every day of the route / every route of the day.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
 import { mountRowDrag } from './row-drag.js';
-import { readList, saveStep, printMenu, printDoc, routeDayPage, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, followLoadSeq, announceChange, onChange, U } from './udcl.js';
+import { readList, saveStep, printMenu, printDoc, routeDayPage, loadMapPage, truckHtml, sortedRouteDays, routesOf, todayKey, followLoadSeq, announceChange, onChange, seqColour, seqChip, U } from './udcl.js';
 
 const params = new URLSearchParams(location.search);
 let data = null, route = params.get('route') || '', day = U.dayOf(params.get('day')) || '';
@@ -33,7 +33,8 @@ function draw() {
   $('rows').innerHTML = stops.map((s, i) => {
     const c = data.customers[s.key] || {};
     return '<tr data-drag="' + e(s.key) + '"><td><span class="stopno">' + (i + 1) + '</span></td>' +
-      '<td>' + (edit ? '<input class="seq" data-i="' + i + '" inputmode="numeric" value="' + (s.loadSeq || '') + '" aria-label="Load sequence for ' + e(c.name || s.name) + '">' : (s.loadSeq || '-')) + '</td>' +
+      // Load Seq takes the same colour as its number on the truck load map (Joe 11-10-26), so a stop is easy to find on the truck.
+      '<td>' + (edit ? '<input class="seq" data-i="' + i + '" inputmode="numeric" value="' + (s.loadSeq || '') + '" style="background:' + seqColour(s.loadSeq) + '" aria-label="Load sequence for ' + e(c.name || s.name) + '">' : seqChip(s.loadSeq)) + '</td>' +
       '<td>' + e(c.chain || '') + '</td><td>' + e(c.account || s.account) + '</td><td class="l"><b>' + e(c.name || s.name) + '</b></td>' +
       '<td class="l">' + (edit ? '<input class="note" data-i="' + i + '" value="' + e(s.note || '') + '" placeholder="Note for this stop">' : e(s.note || '')) + '</td>' +
       '<td>' + (edit ? '<button type="button" class="mv" data-up="' + i + '" title="Move up"' + (i ? '' : ' disabled') + '>&#9650;</button> <button type="button" class="mv" data-down="' + i + '" title="Move down"' + (i < stops.length - 1 ? '' : ' disabled') + '>&#9660;</button> <button type="button" class="ed" data-ed="' + i + '">Edit</button>' : '') + '</td></tr>';
@@ -99,6 +100,8 @@ $('rows').addEventListener('click', ev => {
   else if (b.dataset.down !== undefined) moveStop(Number(b.dataset.down), Number(b.dataset.down) + 1);
   else if (b.dataset.ed !== undefined) openEdit(Number(b.dataset.ed));
 });
+// The colour follows the number while it is typed, before it saves.
+$('rows').addEventListener('input', ev => { if (ev.target.matches('input.seq')) ev.target.style.background = seqColour(U.seqOf(ev.target.value)); });
 $('rows').addEventListener('change', ev => {
   const el = ev.target, i = Number(el.dataset.i);
   if (!el.matches('input.seq, input.note')) return;
