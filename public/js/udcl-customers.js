@@ -3,7 +3,7 @@
 // Route Menu workbook here (and the Route Book with it), or brings over the Sales app's list.
 import { requireSignIn, escapeHtml as e, showError, serverText, shortDate } from './shell.js';
 import { openCard, panel } from './udcl-card.js';
-import { readList, saveStep, savedView, saveView, printMenu, printDoc, tablePage, routeDayPage, sortedRouteDays, routesOf, U } from './udcl.js';
+import { readList, saveStep, savedView, saveView, printMenu, printDoc, tablePage, routeDayPage, sortedRouteDays, routesOf, announceChange, U } from './udcl.js';
 
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
@@ -26,6 +26,7 @@ const dayName = (d) => U.DAY_NAMES[d] || d;
 function fillPickers() {
   const keep = (id, opts, all) => { const box = $(id), was = box.value; box.innerHTML = '<option value="">' + all + '</option>' + opts.map(([v, t]) => '<option value="' + e(v) + '">' + e(t) + '</option>').join(''); box.value = opts.some(o => o[0] === was) ? was : ''; };
   keep('route', routesOf(data.routeDays).map(r => [r, 'Route ' + r]), 'All routes');
+  $('route-list').innerHTML = routesOf(data.routeDays).map(r => '<option value="' + e(r) + '">').join('');
   keep('day', U.DAYS.map(d => [d, dayName(d)]), 'All days');
   const chains = [...new Set(Object.values(data.customers).map(c => c.chain).filter(Boolean))].sort(U.byRoute);
   keep('chain', chains.map(c => [c, 'Chain ' + c]), 'All chains');
@@ -54,6 +55,53 @@ function customersShown() {
 // holding the route that delivers that day, with no stop number.
 const routesOn = (c, day) => [...new Set((c.deliveries || []).filter(d => d.day === day).map(d => d.route))].join(', ');
 const dcPlain = (v) => U.dcName(v).replace(/^\d+\s+/, '');
+/** By Customer: one line per customer and route it is on (a customer on no route gets one line with an empty route box). The Route
+ * and Day boxes leave out the routes that do not match them. */
+function routeRows(rows, fl) {
+  const out = [];
+  rows.forEach(c => {
+    const ds = c.deliveries || [];
+    const routes = [...new Set(ds.map(d => d.route))].sort(U.byRoute).filter(r => (!fl.route || r === fl.route) && (!fl.day || ds.some(d => d.route === r && d.day === fl.day)));
+    if (routes.length) routes.forEach(route => out.push({ c, route }));
+    else if (!ds.length) out.push({ c, route: '' });
+  });
+  return out;
+}
+const daysOn = (c, route) => (c.deliveries || []).filter(d => d.route === route).map(d => d.day);
+/** One By Customer line. Someone who can change the list types the route and ticks the days; each change saves by itself. */
+function customerLine(c, route) {
+  const on = daysOn(c, route), ed = data.canEdit, k = e(c.key), r = e(route);
+  const routeCell = ed ? '<input class="rt" type="text" inputmode="numeric" list="route-list" maxlength="' + U.LIMITS.route + '" value="' + r + '" data-from="' + r + '" placeholder="Route" aria-label="Route for ' + e(c.name) + '">' : r;
+  return '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + k + '" data-route="' + r + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l" title="' + e(c.name) + '"><b>' + e(c.name) + '</b></td><td class="l">' + e(dcPlain(c.dc)) + '</td><td class="rtcell">' + routeCell + '</td>' +
+    U.DAYS.map(d => '<td class="dayroute"><label class="tick"><input type="checkbox" value="' + d + '"' + (on.includes(d) ? ' checked' : '') + (ed ? '' : ' disabled') + ' aria-label="' + e(dayName(d)) + (route ? ' on route ' + r : '') + ' for ' + e(c.name) + '"></label></td>').join('') + '</tr>';
+}
+/**
+ * Joe 11-10-26: a change on a By Customer line saves by itself (the Route Book's own step, placeStop). The days ticked on the line
+ * are the days the customer is on that line's route afterwards; a new route number moves every ticked day to it. A new day goes in
+ * by its load sequence, as on Route Book.
+ */
+async function saveLine(tr) {
+  const key = tr.dataset.key, from = tr.dataset.route, box = tr.querySelector('input.rt'), route = U.numText(box ? box.value : from, U.LIMITS.route);
+  const days = [...tr.querySelectorAll('input[type="checkbox"]')].filter(x => x.checked).map(x => x.value);
+  const c = allCustomers.find(x => x.key === key), was = c ? daysOn(c, from) : [];
+  if (!/^\d+$/.test(route)) {
+    // A route is a number. Clearing the box does not take the customer off: unticking its days does.
+    showError(from ? (route ? 'A route is a number, like 815.' : 'To take ' + (c ? c.name : 'this customer') + ' off route ' + from + ', untick its days.') : days.length ? 'Type the route number first, then tick the days.' : route ? 'A route is a number, like 815.' : '');
+    if (box) box.value = from;
+    if (!from) tr.querySelectorAll('input[type="checkbox"]').forEach(x => { x.checked = false; });
+    return;
+  }
+  if (!from && !days.length) return;   // a route typed on a customer with none: it goes on once a day is ticked
+  if (route === from && days.length === was.length && days.every(d => was.includes(d))) return;
+  tr.querySelectorAll('input').forEach(x => { x.disabled = true; });
+  tr.classList.add('saving');
+  try {
+    const out = await saveStep('placeStop', { key, from: from || route, route, day: was[0] || days[0], days, stay: [] });
+    (out.changed || []).forEach(x => { const i = data.routeDays.findIndex(y => y.route === x.route && y.day === x.day); if (i >= 0) data.routeDays[i] = x; else data.routeDays.push(x); announceChange(x.route, x.day); });
+    showError('');
+  } catch (err) { showError(serverText(err, 'the customer list')); }
+  rebuild();
+}
 // Only the first lines are drawn; "Show more" adds the next ones. Narrowing the boxes starts again from the top.
 const PAGE = 300;
 let shown = PAGE;
@@ -80,13 +128,14 @@ function draw() {
       '<tr><td colspan="8" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else if (view === 'customer') {
-    const rows = customersShown();
-    // Joe 11/3: "doesn't need the address in this. And doesn't need the group in this." The group is set on Customers.
-    $('thead').innerHTML = '<tr><th style="width:6%">Chain</th><th style="width:9%">Account</th><th class="l">Customer</th><th class="l" style="width:14%">DC</th>' +
-      U.DAYS.map(d => '<th class="dayroute" style="width:6.5%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
-    $('rows').innerHTML = page(rows).map(c => '<tr class="pick' + (c.active === false ? ' inactive' : '') + '" data-key="' + e(c.key) + '"><td>' + e(c.chain) + '</td><td>' + e(c.account) + '</td><td class="l"><b>' + e(c.name) + '</b></td><td class="l">' + e(dcPlain(c.dc)) + '</td>' +
-      U.DAYS.map(d => '<td class="dayroute">' + e(routesOn(c, d)) + '</td>').join('') + '</tr>').join('') + moreRow(rows, 11) ||
-      '<tr><td colspan="11" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
+    const rows = customersShown(), lines = routeRows(rows, fl);
+    // Joe 11/2: Chain, Account, Customer, DC, then the days. Joe 11-10-26: "be able to change the route ... tick the days that I
+    // want", and fit the screen with no sideways scroll. One line per customer and route, the route in its own box and a tick
+    // for each day it delivers.
+    $('thead').innerHTML = '<tr><th style="width:5%">Chain</th><th style="width:7%">Account</th><th class="l">Customer</th><th class="l" style="width:10%">DC</th><th style="width:7.5%">Route</th>' +
+      U.DAYS.map(d => '<th class="dayroute" style="width:5.5%">' + e(dayName(d).slice(0, 3)) + '</th>').join('') + '</tr>';
+    $('rows').innerHTML = page(lines).map(r => customerLine(r.c, r.route)).join('') + moreRow(lines, 12) ||
+      '<tr><td colspan="12" class="empty">' + (Object.keys(data.customers).length ? 'No customer matches these boxes.' : emptyText()) + '</td></tr>';
     $('count').textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
   } else {
     const lines = U.pick(allLines, fl);
@@ -230,7 +279,14 @@ let typing = null;
 $('rows').addEventListener('click', ev => {
   const more = ev.target.closest('button[data-more]');
   if (more) { shown = more.dataset.more === 'all' ? Infinity : shown + PAGE; draw(); return; }
-  if (ev.target.closest('a, select, input, button')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
+  if (ev.target.closest('a, select, input, button, label')) return; const tr = ev.target.closest('tr[data-key]'); if (tr) openCustomer(tr.dataset.key); });
+// Joe 11-10-26: on By Customer, a ticked or unticked day, or a new route number, saves that line by itself.
+$('rows').addEventListener('change', ev => {
+  if (view !== 'customer') return;
+  const x = ev.target.closest('input[type="checkbox"], input.rt'), tr = x && x.closest('tr[data-key]');
+  if (tr) saveLine(tr);
+});
+$('rows').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('input.rt')) ev.target.blur(); });
 // Joe 11-6-26: PALLET USES saves by itself for that customer on that route day.
 $('rows').addEventListener('change', async ev => {
   const sel = ev.target.closest('select.uses');
