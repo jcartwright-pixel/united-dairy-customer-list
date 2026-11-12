@@ -65,6 +65,27 @@ async function ph0(browser) {
   // CHROME_PATH: a Chromium already on the computer (a test machine without Playwright's own download).
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
   try {
+    // Home (Joe 11-12-26): the menu down the left, the numbers, today's routes, the week, what is missing and the newest changes.
+    const h = await page(browser, EMAIL);
+    await h.goto(h.emailFor('index.html'));
+    await h.waitForSelector('#hm-tiles .hm-tile');
+    assert.equal(await h.$('#udcl-nav'), null, 'Home has the menu on the left, not the row of tabs');
+    assert.deepEqual(await h.$$eval('#home-menu a', a => a.filter(x => x.offsetParent).map(x => x.querySelector('b').textContent)), ['Home', 'Customers', 'Routes', 'Route Book', 'Truck Load Map', 'Administration', 'Help', 'Load Map Kiosk']);
+    assert.deepEqual(await h.$$eval('.hm-tile', t => t.map(x => [x.querySelector('.hm-label').textContent, x.querySelector('.hm-big').textContent])),
+      [['Active customers', '9'], ['On a route', '9'], ['Routes', '3'], ['Stops a week', '12']]);
+    assert.deepEqual(await h.$$eval('#hm-week tbody tr', r => r.map(x => [...x.children].slice(0, 3).map(c => c.textContent))),
+      [['Sunday', '0', '0'], ['Monday', '1', '1'], ['Tuesday', '1', '5'], ['Wednesday', '0', '0'], ['Thursday', '1', '3'], ['Friday', '1', '2'], ['Saturday', '1', '1']]);
+    assert.equal(await h.textContent('#hm-today-title'), 'Today, ' + U.DAY_NAMES[today]);
+    assert.match(await h.textContent('#hm-changes'), /Route Menu brought in: Made Up Route Menu\.xlsb/);
+    assert.match(await h.textContent('#hm-missing'), /No street address\s*8/);
+    const hv = await page(browser, VIEWER);
+    await hv.goto(hv.emailFor('index.html'));
+    await hv.waitForSelector('#hm-tiles .hm-tile');
+    assert.deepEqual(await hv.$$eval('#home-menu a', a => a.filter(x => x.offsetParent).map(x => x.querySelector('b').textContent)), ['Home', 'Routes', 'Route Book', 'Truck Load Map', 'Help'], 'a dispatcher sees no administrator screens');
+    await shot(h, 'udcl-1920-home');
+    if (SHOTS) { await h.setViewportSize({ width: 1366, height: 768 }); await shot(h, 'udcl-1366-home'); await h.setViewportSize({ width: 390, height: 844 }); await shot(h, 'udcl-390-home'); }
+    await h.context().close(); await hv.context().close();
+
     // Customers: by customer, by route, by day; a card; the Print menu.
     const p = await page(browser, EMAIL);
     await p.goto(p.emailFor('customers.html'));

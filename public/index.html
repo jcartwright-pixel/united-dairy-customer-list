@@ -11,7 +11,9 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/udcl.css">
 </head>
-<body class="udcl-page" data-help="home">
+<body class="udcl-page udcl-home-page" data-help="home" data-nav="none">
+  <!-- Joe 11-12-26: "Make this home screen a lot better ... more detail, maybe in the menu option like we have on the left".
+       The menu down the left side; on the right what the list holds. udcl-home.js draws it. -->
   <div class="signin" id="signin" hidden>
     <h1>Customer List</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -24,33 +26,31 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <div class="head"><div class="title"><span class="eyebrow">United Dairy Customer List &middot; <span id="plant-name"></span></span><h1>Customer List</h1></div></div>
-    <div class="udcl-home" id="tiles"></div>
-    <p class="udcl-help" id="imported"></p>
-    <div class="udcl-install" id="install-box" hidden>
-      <b>Get the Customer List app</b>
-      <span id="install-how">It opens on this computer in its own window, with its own icon, like the Operations app.</span>
-      <button type="button" class="primary" id="install">Install the app</button>
+    <div class="hm-layout">
+      <aside class="hm-side" aria-label="Customer List screens">
+        <h2 class="hm-side-title">Menu</h2>
+        <nav class="hm-menu" id="home-menu"></nav>
+        <div class="udcl-install hm-install" id="install-box" hidden>
+          <b>Get the Customer List app</b>
+          <span id="install-how">It opens on this computer in its own window, with its own icon, like the Operations app.</span>
+          <button type="button" class="primary" id="install">Install the app</button>
+        </div>
+      </aside>
+      <main class="hm-main">
+        <div class="head"><div class="title"><span class="eyebrow">United Dairy Customer List &middot; <span id="plant-name"></span></span><h1>Customer List</h1><small id="hm-asof"></small></div></div>
+        <div id="home-body">
+          <div class="hm-tiles" id="hm-tiles"></div>
+          <div class="hm-grid">
+            <section class="hm-card hm-wide"><h2 id="hm-today-title"></h2><div id="hm-today"></div></section>
+            <section class="hm-card"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/chart-column.svg);mask-image:url(img/icons/chart-column.svg)" aria-hidden="true"></span>The week</h2><div id="hm-week"></div></section>
+            <section class="hm-card"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/list-checks.svg);mask-image:url(img/icons/list-checks.svg)" aria-hidden="true"></span>Missing on active customers</h2><div id="hm-missing"></div></section>
+            <section class="hm-card hm-wide"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/history.svg);mask-image:url(img/icons/history.svg)" aria-hidden="true"></span>Newest changes</h2><div id="hm-changes"></div></section>
+          </div>
+        </div>
+      </main>
     </div>
   </div>
-  <script type="module">import { requireSignIn, SCREENS, escapeHtml as e, showError, serverText, shortDate, installed, installApp, canInstall } from './js/shell.js';
-import { readList } from './js/udcl.js';
-document.getElementById('tiles').innerHTML = SCREENS.filter(s => s.href !== 'index.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + '><strong>' + e(s.name) + '</strong>' + e(s.note) + '</a>').join('');
-// Joe 11/1: "want to downloadable app" ... "This has to be the desktop version": Install opens the browser's own box (Chrome or
-// Edge on a computer). There is no phone app.
-function showInstall() {
-  document.getElementById('install-box').hidden = installed() || !canInstall();
-}
-document.addEventListener('udcl-installable', showInstall);
-document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };
-showInstall();
-requireSignIn(async () => {
-  try {
-    const d = await readList();
-    document.getElementById('plant-name').textContent = d.plantName || '';
-    const n = Object.keys(d.customers || {}).length, r = (d.routeDays || []).length;
-    document.getElementById('imported').textContent = n ? n + ' customers on ' + r + ' route days' + (d.imported && d.imported.at ? ' · last import ' + shortDate(d.imported.at) + ' by ' + (d.imported.by || '') : '') + '.' : 'The list is empty. An administrator imports the Route Menu on Routes.';
-  } catch (err) { showError(serverText(err, 'the customer list')); }
-});</script>
+  <script src="js/udcl-rules.js"></script>
+  <script type="module">import './js/udcl-home.js';</script>
 </body>
 </html>
