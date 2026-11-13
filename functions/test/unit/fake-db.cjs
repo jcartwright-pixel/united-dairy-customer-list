@@ -17,9 +17,9 @@ function fakeDb(seed) {
     batch: () => { const ops = []; return { set: (r, v) => ops.push(() => r.set(v)), delete: (r) => ops.push(() => r.delete()), commit: async () => { for (const o of ops) await o(); } }; },
     runTransaction: async (fn) => {
       const writes = [];
-      const tx = { get: async (r) => snap(r.path), getAll: async (...refs) => refs.map(r => snap(r.path)), set: (r, v) => writes.push([r, v]) };
+      const tx = { get: async (r) => snap(r.path), getAll: async (...refs) => refs.map(r => snap(r.path)), set: (r, v, o) => writes.push([r, v, o]) };
       const out = await fn(tx);
-      for (const [r, v] of writes) await r.set(v);
+      for (const [r, v, o] of writes) await r.set(v, o);
       return out;
     }
   };
