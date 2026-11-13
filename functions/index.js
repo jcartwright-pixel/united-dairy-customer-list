@@ -30,3 +30,29 @@ exports.customerList = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (
   }
 });
 
+
+/*
+ * Joe 11-9-26 ("The hub is the only thing allowed to save to the customer list") and 11-12-26 (the MapMaker): a change another
+ * app sent to the Hub is saved here once an administrator approves it on the Hub's Customer Changes screen. Built so far: map
+ * points (src/hubchanges.js). It runs when a change turns approved, and once an hour for any that were missed.
+ */
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+
+exports.udclHubChange = onDocumentWritten('hubCustomerChanges/{id}', async (event) => {
+  const after = event.data && event.data.after && event.data.after.exists ? event.data.after.data() : null;
+  if (!after || after.status !== 'approved') return;
+  const H = require('./src/hubchanges');
+  if (H.BUILT.indexOf(after.kind) < 0) return;
+  const out = await H.applyAndPublish(db, event.params.id, new Date().toISOString());
+  console.log('hub change', event.params.id, after.kind, out.done);
+});
+
+exports.udclHubChangeSweep = onSchedule({ schedule: 'every 60 minutes', timeoutSeconds: 300 }, async () => {
+  const H = require('./src/hubchanges');
+  const ids = await H.waitingIds(db);
+  for (const id of ids) {
+    try { await H.applyAndPublish(db, id, new Date().toISOString()); } catch (error) { console.error('hub change', id, error); }
+  }
+  if (ids.length) console.log('hub changes swept', ids.length);
+});
