@@ -301,6 +301,17 @@ async function upload() {
   try {
     say('Reading ' + file.name + '…');
     const X = await loadXlsx(), wb = X.read(await file.arrayBuffer(), { type: 'array' });
+    // Joe 11-14-26: another DC's route list (Ashland's) has day columns; read it before the master list, which has the same DC headings.
+    let dcLines = [];
+    wb.SheetNames.some(n => (dcLines = U.dcRouteRows(sheetRows(X, wb, n))).length);
+    if (dcLines.length) {
+      say('Saving ' + dcLines.length.toLocaleString() + ' route lines for ' + U.dcName(dcLines[0].dc) + '…');
+      const out = await saveStep('importDcRoutes', { rows: dcLines, dc: dcLines[0].dc, fileName: file.name, thenView: true, all: true });
+      setData(out); $('save-msg').textContent = out.message; say(out.message, 'good');
+      if ((out.doubles || []).length) $('i-msg').insertAdjacentHTML('beforeend', '<div class="msg"><b>May already be on the list under another DC</b><ul>' +
+        out.doubles.map(d => '<li>' + e(d.name + ', ' + d.city) + ': ' + e(d.matches.map(m => m.name + ' (' + (dcLabel(m.dc) || 'no DC') + (m.address ? ', ' + m.address : '') + ')').join('; ')) + '</li>').join('') + '</ul></div>');
+      return;
+    }
     let full = [];
     wb.SheetNames.some(n => (full = U.fullListRows(sheetRows(X, wb, n))).length);
     if (full.length) {

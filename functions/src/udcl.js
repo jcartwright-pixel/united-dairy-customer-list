@@ -337,7 +337,8 @@ async function importMenu(db, plant, email, input, stamp) {
   });
   Object.keys(now.customers).forEach(key => {
     // A customer from the company's full list (Joe 11/2) is a customer with no route, not one that left the Route Menu.
-    if (people[key] || now.customers[key].active === false || now.customers[key].onCompanyList) return;
+    // Joe 11-14-26: another DC's customer (Ashland's, brought in with its own route list) is not on this plant's Route Menu.
+    if (people[key] || now.customers[key].active === false || now.customers[key].onCompanyList || otherDc(now.customers[key].dc, plant)) return;
     inactive++;
     writes.push([db.collection(CUSTOMERS).doc(U.customerId(plant, key)), Object.assign({}, now.customers[key], { active: false, updatedAt: stamp, updatedBy: email })]);
   });
@@ -365,7 +366,7 @@ async function importMenu(db, plant, email, input, stamp) {
     after.updatedAt = stamp; after.updatedBy = email;
     writes.push([db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, route, day)), after]);
   });
-  const deletes = now.routeDays.filter(rd => !groups[rd.route + '|' + rd.day]).map(rd => db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, rd.route, rd.day)));
+  const deletes = now.routeDays.filter(rd => !groups[rd.route + '|' + rd.day] && !otherDc(rd.dc, plant)).map(rd => db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, rd.route, rd.day)));
   removedDays = deletes.length;
 
   const counts = { customers: Object.keys(people).length, lines: lines.length, routeDays: Object.keys(groups).length, routes: new Set(lines.map(x => x.route)).size,
@@ -463,6 +464,108 @@ async function importAddresses(db, plant, email, input, stamp) {
   const c = await loadAddresses(db, plant, rows, email, stamp);
   await db.collection('private').doc('udcl_' + plant).set({ addressSheet: { at: stamp, by: email, fileName: U.text(input.fileName, 200), counts: c } }, { merge: true });
   return { ok: true, counts: c, message: rows.length + ' addresses read: ' + c.changed + ' changed, ' + c.same + ' already right' + (c.missing ? ', ' + c.missing + ' not on the list' : '') + (c.refused ? ', ' + c.refused + ' left out (a PO box, mailbox or c/o is not a ship-to address)' : '') + '. They stay through the next Route Menu upload.' };
+}
+
+/** A DC that is not this plant's own (a route day or customer brought in with another DC's route list). */
+function otherDc(dc, plant) { const d = U.branchOf(dc); return !!d && d !== (U.PLANT_DC[plant] || ''); }
+
+/**
+ * Joe 11-14-26: "this is a list of all [Ashland, Kentucky's] routes and customer list ... from when we purchased them ... input all
+ * these into what we have now". A DC's own route list (dcRouteRows): every line one customer on one route, in run order, with the
+ * days ticked. It adds and updates that DC's customers (key D<dc>-<account>, the same key the master list gives them, so a customer
+ * the master list already brought in is updated, not doubled) and sets that DC's route days to the file. Nothing of any other DC is
+ * touched: not this plant's own customers or routes, and no customer is removed. A route day of that DC on a route the file has, but
+ * on a day it no longer has, is taken off. The file has no load sequence (each stop starts at 0; set them on Route Book).
+ * Addresses: an address looked up by hand (a CONFIDENCE column) is saved as checked; otherwise the file's street fills in, never a PO
+ * box over a street and never over an address already checked. A new customer whose name and town, or street and town, match a
+ * customer of another DC is listed back as a possible double (it is still added; the list is for a person to look at).
+ */
+async function importDcRoutes(db, plant, email, input, stamp) {
+  const rows = (Array.isArray(input.rows) ? input.rows : []).slice(0, U.MAX_LINES);
+  const dc = U.dcOf(input.dc || (rows[0] && rows[0].dc));
+  if (!dc) fail('BAD_REQUEST', 'The route list needs a DC column with the DC on every line.');
+  if (dc === (U.PLANT_DC[plant] || '')) fail('BAD_REQUEST', 'This is ' + plantName(plant) + "'s own DC. Its routes come in with Import Route Menu on Routes.");
+  const lines = rows.map(r => ({ r, route: U.numText(r && r.route, U.LIMITS.route), account: U.numText(r && r.account, U.LIMITS.account), name: U.text(r && r.name, U.LIMITS.name), chain: U.numText(r && r.chain, U.LIMITS.chain),
+    days: (Array.isArray(r && r.days) ? r.days : []).map(U.dayOf).filter(Boolean) }))
+    .filter(x => U.dcOf(x.r && x.r.dc) === dc && x.route && x.name);
+  if (!lines.length) fail('BAD_REQUEST', 'No lines for DC ' + dc + ' were found.');
+  lines.forEach(x => { if (x.account === '0') x.account = ''; x.key = 'D' + dc + '-' + U.custKey(x.account, x.name); });
+  const now = await readPlant(db, plant);
+  const writes = [];
+  let added = 0, changed = 0, same = 0, checked = 0;
+  // Possible doubles: another DC's customer with the same name and town, or the same street and town.
+  const norm = (t) => U.text(t).toUpperCase().replace(/\*?COD\*?|[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const others = Object.values(now.customers).filter(c => U.branchOf(c.dc) !== dc && c.active !== false);
+  const byName = {}, byStreet = {};
+  others.forEach(c => { const city = norm(c.city); if (!city) return; (byName[norm(c.name) + '|' + city] = byName[norm(c.name) + '|' + city] || []).push(c); if (c.address && !U.notStreet(c.address)) (byStreet[norm(c.address) + '|' + city] = byStreet[norm(c.address) + '|' + city] || []).push(c); });
+  const doubles = [];
+  const seen = {};
+  lines.forEach(x => {
+    if (seen[x.key]) return;
+    seen[x.key] = true;
+    const r = x.r, before = now.customers[x.key] || null;
+    const after = Object.assign({ plant, key: x.key, account: x.account, name: x.name, chain: x.chain, dc, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null }, before || {});
+    after.name = x.name; after.chain = x.chain; after.account = x.account; after.dc = dc; after.active = true;
+    if (U.inactiveName(x.name)) after.inactive = true; else if (!before) delete after.inactive;
+    const got = U.cleanCustomer({ address: r.address, address2: r.address2 || '', city: r.city, state: r.state, zip: r.zip });
+    if (U.notStreet(got.address2)) got.address2 = '';
+    const setAddress = () => {
+      if (got.address !== after.address || got.city !== after.city) { after.lat = null; after.lon = null; }
+      ['address', 'address2', 'city', 'state', 'zip'].forEach(k => { after[k] = got[k] || ''; });
+    };
+    if (r.checked && got.address && !U.notStreet(got.address)) {
+      setAddress(); after.addressChecked = true; after.addressSource = U.text(r.source, 200); after.addressConfidence = U.text(r.confidence, 20); checked++;
+    } else if (!after.addressChecked && (got.address || got.city) && !(U.notStreet(got.address) && after.address && !U.notStreet(after.address))) {
+      if (!got.address && after.address) ['city', 'state', 'zip'].forEach(k => { if (got[k]) after[k] = got[k]; }); else setAddress();
+    }
+    if (!before) {
+      const city = norm(after.city), hit = (byName[norm(after.name) + '|' + city] || []).concat(after.address && !U.notStreet(after.address) ? byStreet[norm(after.address) + '|' + city] || [] : []);
+      if (city && hit.length) doubles.push({ key: x.key, name: after.name, city: after.city, matches: [...new Set(hit)].slice(0, 3).map(c => ({ key: c.key, name: c.name, dc: c.dc || '', address: c.address || '', city: c.city || '' })) });
+    }
+    if (before && JSON.stringify(Object.assign({}, before, { updatedAt: 0, updatedBy: 0 })) === JSON.stringify(Object.assign({}, after, { updatedAt: 0, updatedBy: 0 }))) { same++; return; }
+    if (!before) added++; else changed++;
+    after.updatedAt = stamp; after.updatedBy = email;
+    writes.push(['set', db.collection(CUSTOMERS).doc(U.customerId(plant, x.key)), before, after, 'customer']);
+  });
+
+  // The route days: each route and day in the file's order (the run order).
+  const groups = {}, routes = new Set();
+  lines.forEach(x => { routes.add(x.route); x.days.forEach(d => { const k = x.route + '|' + d; (groups[k] = groups[k] || []).push(x); }); });
+  const had = {};
+  now.routeDays.forEach(rd => { had[rd.route + '|' + rd.day] = rd; });
+  let newDays = 0, removedDays = 0;
+  Object.keys(groups).forEach(k => {
+    const [route, day] = k.split('|'), before = had[k] || null;
+    if (before && !otherDc(before.dc, plant) && U.branchOf(before.dc) !== dc) fail('BAD_REQUEST', 'Route ' + route + ' on ' + U.DAY_NAMES[day] + ' is already one of ' + plantName(plant) + "'s own routes. Nothing was saved.");
+    const keys = new Set(), stops = [];
+    groups[k].forEach(x => { if (keys.has(x.key)) return; keys.add(x.key); const old = before && (before.stops || []).find(s => s.key === x.key); stops.push({ key: x.key, account: x.account, name: x.name, chain: x.chain, loadSeq: old ? old.loadSeq || 0 : 0, note: old ? old.note || '' : '' }); });
+    const after = Object.assign({ plant, route, day, stops: [], startTime: '', notes: '', map: null, rev: 0 }, before || {});
+    after.dc = dc; after.stops = stops;
+    const kept = after.map && U.mapFits(after.map, after.stops) ? U.cleanMap(after.map) : null;
+    after.map = U.packMap(kept || U.autoMap(after.stops));
+    if (!before) newDays++;
+    after.rev = (before ? before.rev || 0 : 0) + 1;
+    after.updatedAt = stamp; after.updatedBy = email;
+    writes.push(['set', db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, route, day)), before, after, 'routeDay']);
+  });
+  now.routeDays.filter(rd => U.branchOf(rd.dc) === dc && routes.has(rd.route) && !groups[rd.route + '|' + rd.day]).forEach(rd => {
+    removedDays++;
+    writes.push(['delete', db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, rd.route, rd.day)), rd, null, 'routeDay']);
+  });
+  for (let i = 0; i < writes.length; i += 200) {
+    const batch = db.batch();
+    writes.slice(i, i + 200).forEach(([what, ref, before, after, kind]) => {
+      if (what === 'delete') batch.delete(ref); else batch.set(ref, after);
+      logEntry(db, batch, kind, plant, ref, before, after, email, stamp);
+    });
+    await batch.commit();
+  }
+  const name = U.dcName(dc);
+  const counts = { lines: lines.length, customers: Object.keys(seen).length, added, changed, same, checked, routes: routes.size, routeDays: Object.keys(groups).length, newDays, removedDays, doubles: doubles.length };
+  await db.collection('private').doc('udcl_' + plant).set({ dcRoutes: { [dc]: { at: stamp, by: email, fileName: U.text(input.fileName, 200), counts, doubles: doubles.slice(0, 200) } } }, { merge: true });
+  await db.collection(LOG).add({ what: 'importDcRoutes', plant, record: 'udcl_' + plant, before: null, after: { dc, fileName: U.text(input.fileName, 200), counts }, by: email, at: stamp });
+  return { ok: true, counts, doubles, message: name + ': ' + counts.customers + ' customers on ' + counts.routes + ' routes (' + counts.routeDays + ' route days). ' + added + ' added, ' + changed + ' updated, ' + same + ' already right; ' + checked + ' checked addresses saved. Nobody was removed.' +
+    (removedDays ? ' ' + removedDays + ' route days the file no longer has were taken off.' : '') + (doubles.length ? ' ' + doubles.length + ' may already be on the list under another DC: see the list below.' : '') + ' Load sequences start at 0; set them on Route Book.' };
 }
 
 /**
@@ -811,8 +914,8 @@ async function publishRouteMaster(db, plant, d, stamp, known) {
   return true;
 }
 
-const OPS = { setPalletUses, savePalletRules, changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList };
-const NEEDS = { setPalletUses: 'edit', savePalletRules: 'edit', changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList' };
+const OPS = { setPalletUses, savePalletRules, changeAccount, setGroup, saveGroups, setStatus, applyRouteRule, saveRouteDay, placeStop, saveCustomer, importMenu, copySales, importAddresses, importFullList, importDcRoutes };
+const NEEDS = { setPalletUses: 'edit', savePalletRules: 'edit', changeAccount: 'edit', setGroup: 'edit', saveGroups: 'importList', setStatus: 'importList', applyRouteRule: 'importList', saveRouteDay: 'edit', placeStop: 'edit', saveCustomer: 'edit', importMenu: 'importList', copySales: 'importList', importAddresses: 'importList', importFullList: 'importList', importDcRoutes: 'importList' };
 
 /** The one call. db = the company's database; who = the signed-in person ({ email }); plant = the plant the call is for (checked). */
 async function udclCall(db, who, plant, input, deps) {
@@ -856,4 +959,4 @@ async function salesRows(db, plant) {
   return { rows, savedAt: at };
 }
 
-module.exports = { routeMasterOf, publishRouteMaster, ROUTE_MASTER, addCases, setPalletUses, savePalletRules, udclCall, salesRows, routeBook, importMenu, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
+module.exports = { routeMasterOf, publishRouteMaster, ROUTE_MASTER, addCases, setPalletUses, savePalletRules, udclCall, salesRows, routeBook, importMenu, importDcRoutes, loadAddresses, saveRouteDay, placeStop, saveCustomer, copySales, view, readPlant, rightsOf, UdclError, CUSTOMERS, ROUTE_DAYS, LOG };
