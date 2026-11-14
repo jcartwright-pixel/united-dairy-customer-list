@@ -8,17 +8,17 @@ screens: index.html
 
 The **United Dairy Customer List** is its own app. It keeps every customer, the routes and days they get a delivery, the run order and the truck load maps. Operations reads it: the Sales app's customers and the drivers' **Route Book** on their phones come from here. Sign in with the same United Dairy Google account as Operations. Who can open it is ticked in the United Dairy Hub, People & Access (Customers & Routes); until it is ticked or unticked for someone, everyone Enabled can.
 
-Home shows the **menu** down the left side and, on the right, what the list holds today. Nothing is changed from Home.
+Home shows the **menu** down the left side and, on the right, what the list holds for one location. Nothing is changed from Home.
 
 1. Pick a screen from the **menu** on the left. Each one says what it is for. **Customers**, **Administration** and **Load Map Kiosk** show only to administrators. The other screens keep the row of tabs under the header.
 2. Someone set up for more than one plant picks the plant in the header.
-3. Read what the list holds on the right:
+3. Pick the location in **Location** at the top right: `30 Uniontown`, `AS Ashland` and every other DC on the list, or `All locations`. Everything on the right is for the location picked. Home remembers it on this computer; the first time it is your plant's own DC.
+4. Read what the list holds on the right:
    - The four numbers at the top: **Active customers** (inactive ones are not counted), **On a route** (and how many are on no route), **Routes** (and how many route days) and **Stops a week**.
-   - **Today**: every route that runs today, with its stops and start time. Press one to open it in **Route Book**.
    - **The week**: the routes and stops on each day, Sunday to Saturday, with a bar to compare the days. Today is shaded.
    - **Missing on active customers**: how many have no route, no street address, no map point or no phone. An administrator presses `Open` to go fill them in on **Customers** (or **Routes** for no route).
    - **Newest changes**: the last Route Menu and master list brought in, and the route days changed most lately, with who changed them. Press a route day to open it in **Route Book**.
-4. To get the Customer List as its own app on your computer (its own window and icon, like the Operations app), press `Install the app` on Home in Chrome or Edge, or use the install icon at the right end of the address bar.
+5. To get the Customer List as its own app on your computer (its own window and icon, like the Operations app), press `Install the app` on Home in Chrome or Edge, or use the install icon at the right end of the address bar.
 
 > The `? Help` button on every screen opens its own part of this guide.
 
