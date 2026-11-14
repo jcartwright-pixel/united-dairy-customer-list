@@ -552,3 +552,56 @@ test('who may change what follows the United Dairy Hub (Joe 11-4-26): role stand
   assert.equal(rightsOf({ status: 'ACTIVE', roles: ['Sales'] }, { templates: { SALES: ['customers.edit'] }, meta: {}, exceptions: {} }).edit, true, 'a role ticked in Roles & Rights');
   assert.deepEqual(rightsOf({ status: 'INACTIVE', roles: ['Administrator'] }, none), { view: false, edit: false, importList: false });
 });
+
+test('Joe 11-14-26: another DC\'s route list (Ashland, DC AS) adds its customers and routes and never touches Uniontown\'s', async () => {
+  assert.equal(U.dcOf('as'), 'AS');
+  assert.equal(U.branchOf('AS'), 'AS');
+  assert.equal(U.dcName('AS'), 'AS Ashland');
+  assert.equal(U.dcOf('ZZ'), '', 'only a lettered DC we know');
+  // Made-up lines, the Ashland layout with a DC column added: two ADDRESS headings, a day column for each day.
+  const sheet = [
+    ['DC', 'ROUTE', 'CHAIN', 'CUSTOMER#', 'CUSTOMER NAME', 'MONDAY', 'TUESDAY', 'WED', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'ADDRESS', 'ADDRESS', 'CITY', 'STATE', 'ZIP', 'CONFIDENCE', 'SOURCE'],
+    ['AS', 2901, 0, 8001, 'HILLTOP GROCERY', null, null, null, null, 1, null, '12 RIDGE RD', '', 'RIVERTON', 'KY', null, null, null],
+    ['AS', 2901, 0, 8002, 'CREEK STOP *COD*', 1, null, 0, null, 1, null, 'PO BOX 9', '', 'RIVERTON', 'KY', null, '', ''],
+    ['AS', 2901, 0, 8003, 'LAKE MART', null, null, null, null, 1, null, 'X', 'X', 'X', 'XX', null, 'high', 'store web site'],
+    ['AS', 2902, 0, 8001, 'HILLTOP GROCERY', null, null, null, 1, null, null, '12 RIDGE RD', '', 'RIVERTON', 'KY', null, null, null],
+    ['AS', 2902, 0, 8004, 'ACME MARKET', null, null, null, 1, null, null, '1 MAIN ST', '', 'TOWN', 'PA', null, 'medium', 'map']
+  ];
+  const rows = U.dcRouteRows(sheet);
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows[1].days, ['MON', 'FRI'], 'a 0 is not a delivery');
+  assert.equal(rows[2].address, '', 'X is no address');
+  assert.equal(rows[2].checked, true);
+  assert.equal(U.dcRouteRows(MENU).length, 0, 'the Route Menu (a DAY column) is not a DC route list');
+  const { db } = await imported();
+  const before = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  const uniontownDays = before.routeDays.length;
+  await assert.rejects(S.udclCall(db, mgr, PLANT, { op: 'importDcRoutes', rows, dc: 'AS' }), /Only an administrator/);
+  const out = await S.udclCall(db, boss, PLANT, { op: 'importDcRoutes', rows, dc: 'AS', fileName: 'ashland.xlsx' }, now);
+  assert.deepEqual([out.counts.customers, out.counts.added, out.counts.routes, out.counts.routeDays], [4, 4, 2, 3]);
+  let v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.equal(v.customers['DAS-8001'].dc, 'AS');
+  assert.equal(v.customers['DAS-8002'].address, 'PO BOX 9', 'a PO box is kept when there is nothing better');
+  assert.equal(v.customers['DAS-8003'].address, '', 'an X is not saved');
+  assert.equal(v.customers['DAS-8004'].addressChecked, true);
+  assert.equal(v.customers['5001'].name, 'ACME MARKET', 'Uniontown\'s customer is not touched');
+  const fri = v.routeDays.find(rd => rd.route === '2901' && rd.day === 'FRI');
+  assert.deepEqual(fri.stops.map(s => s.key), ['DAS-8001', 'DAS-8002', 'DAS-8003'], 'the file\'s order is the run order');
+  assert.equal(fri.dc, 'AS');
+  assert.equal(v.routeDays.length, uniontownDays + 3, 'Uniontown\'s route days stay');
+  assert.ok(out.doubles.some(d => d.key === 'DAS-8004' && d.matches[0].key === '5001'), 'same name and town under another DC is listed');
+  // Again with Monday dropped: that route day comes off; nobody is removed.
+  rows[1].days = ['FRI'];
+  const again = await S.udclCall(db, boss, PLANT, { op: 'importDcRoutes', rows, dc: 'AS' }, now);
+  assert.equal(again.counts.removedDays, 1);
+  assert.equal(again.counts.added, 0);
+  // The next Uniontown Route Menu upload keeps Ashland's customers and routes.
+  const m = U.menuStops(MENU);
+  await S.udclCall(db, boss, PLANT, { op: 'importMenu', stops: m.stops, unrouted: m.unrouted, addresses: {}, gps: {}, book: {}, fileName: 'menu.xlsb' }, now);
+  v = await S.udclCall(db, boss, PLANT, { op: 'view' });
+  assert.notEqual(v.customers['DAS-8001'].active, false);
+  assert.ok(v.routeDays.some(rd => rd.route === '2901' && rd.day === 'FRI'));
+  // A route that is Uniontown's own is refused.
+  await assert.rejects(S.udclCall(db, boss, PLANT, { op: 'importDcRoutes', rows: [Object.assign({}, rows[0], { route: '900', days: ['TUE'] })], dc: 'AS' }, now), /own routes/);
+  await assert.rejects(S.udclCall(db, boss, PLANT, { op: 'importDcRoutes', rows: [Object.assign({}, rows[0], { dc: '30' })], dc: '30' }, now), /own DC/);
+});

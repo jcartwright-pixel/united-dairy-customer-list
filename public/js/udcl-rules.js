@@ -409,11 +409,14 @@
   }
 
   // Joe 11/1: every place has a distribution center code (DC). A customer belongs to one; a plant's own customers start with its code.
-  var DCS = [{ code: '1', name: 'Martins Ferry' }, { code: '6', name: 'Lancaster' }, { code: '7', name: 'Fairmont' }, { code: '9', name: 'Marietta' }, { code: '30', name: 'Uniontown' }, { code: '50', name: 'Charleston' }];
+  // Joe 11-14-26: Ashland, Kentucky (bought from Modern Foods) is a DC whose number nobody knows yet: "just put AS for the DC".
+  // A DC code is a number, or one of the lettered codes here until its number is known.
+  var DCS = [{ code: '1', name: 'Martins Ferry' }, { code: '6', name: 'Lancaster' }, { code: '7', name: 'Fairmont' }, { code: '9', name: 'Marietta' }, { code: '30', name: 'Uniontown' }, { code: '50', name: 'Charleston' }, { code: 'AS', name: 'Ashland' }];
+  var LETTER_DCS = { AS: 1 };
   var PLANT_DC = { fac_martins_ferry: '1', fac_uniontown: '30', fac_charleston: '50' };
   /** The DC code when it is one of ours ('030' and 30 are '30'), else ''. */
   // Joe 11/2: the full company list has every distribution center, also ones with no name here yet (61, 71, 142 ...): keep the number.
-  function dcOf(v) { var t = numText(v, 6).replace(/^0+(?=\d)/, ''); return /^\d{1,4}$/.test(t) ? t : ''; }
+  function dcOf(v) { var t = numText(v, 6).replace(/^0+(?=\d)/, ''); return /^\d{1,4}$/.test(t) ? t : LETTER_DCS[t.toUpperCase()] ? t.toUpperCase() : ''; }
   // Joe 11/3: the master file's DC column also holds route numbers. "103, 107, 112 are all just route numbers. They are not branches",
   // "anything above 80 is not a branch", and 0, 8, 11, 12 and 14 are not either. "Look at the chain and customer number to determine
   // the DC": every one of those customers is chain 0 with an account from one 4 to 5 digit series, the Marietta books (DC 9 has no
@@ -421,7 +424,7 @@
   // shows under Route.
   // Route 815 is Uniontown's (Beaver County, PA; it is on the Uniontown Route Menu), not Marietta's.
   var NOT_BRANCH = { '0': 1, '8': 1, '11': 1, '12': 1, '14': 1 }, ROUTE_BRANCH = '9', ROUTE_OWNER = { '815': '30' };
-  function isBranchCode(t) { return !!t && !NOT_BRANCH[t] && Number(t) <= 80; }
+  function isBranchCode(t) { return !!t && (!!LETTER_DCS[t] || (!NOT_BRANCH[t] && Number(t) <= 80)); }
   /** The customer's branch (DC) code: the code itself, or Marietta for a route number; '' when blank. */
   function branchOf(v) { var t = dcOf(v); return !t || isBranchCode(t) ? t : ROUTE_OWNER[t] || ROUTE_BRANCH; }
   // Joe 11/3: "any customer that has 3 periods in front of the name is an inactive customer." An upload makes it inactive.
@@ -451,6 +454,47 @@
    */
   function notStreet(a) {
     return /(\bP\.?\s*O\.?\s*(BOX|BX|DRAWER)\b|\bPOST\s+OFFICE\b|\bMAIL\s*BOX\b|\bPMB\b|\bC\s*\/\s*O\b|\bCARE\s+OF\b|\bR\.?\s*R\.?\s*#?\s*\d+[,\s]+BOX\b|\bR\.?\s*D\.?\s*#?\s*\d*[,\s]+BOX\b|^\s*BOX\s+\d)/i.test(String(a || ''));
+  }
+
+  /**
+   * Joe 11-14-26: a DC's own route list (Ashland's, from when it was bought): one line per customer and route, in run order, with a
+   * DC column, ROUTE, CHAIN, ACCOUNT (or CUSTOMER#), NAME (or CUSTOMER NAME) and a column for each day ticked (MONDAY, TUE ...; a 1,
+   * an X or any mark is a delivery, blank or 0 is not), then the ship-to address (STREET or ADDRESS, SECOND LINE or a second ADDRESS,
+   * CITY, STATE, ZIP). A CONFIDENCE column (with SOURCE) marks the address as one looked up by hand. It is not the Route Menu (that
+   * has a DAY column) and not the master list (that has no day columns).
+   * One row per line: { dc, route, chain, account, name, days: ['MON', ...], address, address2, city, state, zip, checked, confidence, source }.
+   */
+  var DAY_HEADS = { SUNDAY: 'SUN', SUN: 'SUN', MONDAY: 'MON', MON: 'MON', TUESDAY: 'TUE', TUE: 'TUE', TUES: 'TUE', WEDNESDAY: 'WED', WED: 'WED',
+    THURSDAY: 'THU', THU: 'THU', THUR: 'THU', THURS: 'THU', FRIDAY: 'FRI', FRI: 'FRI', SATURDAY: 'SAT', SAT: 'SAT' };
+  function dcRouteRows(rows) {
+    rows = rows || [];
+    for (var r = 0; r < Math.min(rows.length, 20); r++) {
+      var cells = (rows[r] || []).map(function (c) { return text(c).toUpperCase(); });
+      var at = function (names) { for (var i = 0; i < names.length; i++) { var x = cells.indexOf(names[i]); if (x >= 0) return x; } return -1; };
+      var dc = at(['DC']), route = at(['ROUTE', 'RT']), acct = at(['ACCOUNT', 'CUSTOMER#', 'CUSTOMER #', 'CUST#', 'CUST #']), name = at(['NAME', 'CUSTOMER NAME', 'CUSTOMER']);
+      var days = [];
+      cells.forEach(function (c, i) { if (DAY_HEADS[c]) days.push([i, DAY_HEADS[c]]); });
+      if (dc < 0 || route < 0 || acct < 0 || name < 0 || !days.length) continue;
+      var chain = at(['CHAIN']), a1 = at(['STREET', 'ADDRESS', 'ADDRESS 1', 'STREET 1']), a2 = at(['SECOND LINE', 'ADDRESS 2', 'STREET 2']);
+      if (a2 < 0 && a1 >= 0) a2 = cells.indexOf('ADDRESS', a1 + 1);
+      var city = at(['CITY']), st = at(['STATE', 'ST']), zip = at(['ZIP', 'ZIP CODE']), conf = at(['CONFIDENCE']), src = at(['SOURCE']);
+      var cell = function (row, i, max) { return i >= 0 ? text(row[i], max) : ''; };
+      // "X", "XX", "XXXXX" in an address cell mean no address.
+      var addr = function (row, i, max) { var t = cell(row, i, max); return /^X*$/i.test(t) ? '' : t; };
+      var out = [];
+      for (var i = r + 1; i < rows.length; i++) {
+        var row = rows[i] || [], d = dcOf(row[dc]), rt = numText(row[route], LIMITS.route), account = numText(row[acct], LIMITS.account), nm = text(row[name], LIMITS.name);
+        if (!d || !rt || !nm) continue;
+        var ticked = days.filter(function (x) { var v = text(row[x[0]]); return v && v !== '0'; }).map(function (x) { return x[1]; });
+        var s1 = addr(row, a1, LIMITS.address), s2 = addr(row, a2, LIMITS.address);
+        var x = { dc: d, route: rt, chain: chain >= 0 ? numText(row[chain], LIMITS.chain) : '', account: account === '0' ? '' : account, name: nm, days: ticked,
+          address: s1, address2: s2 && s2.toUpperCase() !== s1.toUpperCase() ? s2 : '', city: addr(row, city, LIMITS.city), state: addr(row, st, LIMITS.state).toUpperCase(), zip: zip >= 0 ? numText(row[zip], LIMITS.zip) : '' };
+        if (conf >= 0 && cell(row, conf, 20)) { x.checked = true; x.confidence = cell(row, conf, 20); x.source = cell(row, src, 200); }
+        out.push(x);
+      }
+      return out;
+    }
+    return [];
   }
 
   /**
@@ -538,6 +582,6 @@
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, byName: byName, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,
-    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, ADDRESS_FIELDS: ADDRESS_FIELDS,
+    lines: lines, SORTS: SORTS, pick: pick, customerRows: customerRows, dayLetters: dayLetters, cleanStops: cleanStops, cleanCustomer: cleanCustomer, addressLine: addressLine, notStreet: notStreet, checkedAddressRows: checkedAddressRows, fullListRows: fullListRows, dcRouteRows: dcRouteRows, ADDRESS_FIELDS: ADDRESS_FIELDS,
     CASE_RULES: CASE_RULES, CASE_RULE_NAMES: CASE_RULE_NAMES, PALLET_RULES: PALLET_RULES, ruleOf: ruleOf, palletRules: palletRules, caseStats: caseStats, heldCases: heldCases };
 });
