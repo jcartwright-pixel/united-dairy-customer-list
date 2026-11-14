@@ -75,7 +75,15 @@ async function ph0(browser) {
       [['Active customers', '9'], ['On a route', '9'], ['Routes', '3'], ['Stops a week', '12']]);
     assert.deepEqual(await h.$$eval('#hm-week tbody tr', r => r.map(x => [...x.children].slice(0, 3).map(c => c.textContent))),
       [['Sunday', '0', '0'], ['Monday', '1', '1'], ['Tuesday', '1', '5'], ['Wednesday', '0', '0'], ['Thursday', '1', '3'], ['Friday', '1', '2'], ['Saturday', '1', '1']]);
-    assert.equal(await h.textContent('#hm-today-title'), 'Today, ' + U.DAY_NAMES[today]);
+    // Joe 11-14-26: no Today's routes on Home; a DC picker instead, starting at the plant's own DC.
+    assert.equal(await h.$('#hm-today'), null, 'Home has no Today routes');
+    assert.equal(await h.inputValue('#dcpick'), '30');
+    assert.equal(await h.textContent('#plant-name'), '30 Uniontown');
+    assert.deepEqual(await h.$$eval('#dcpick option', o => o.map(x => x.textContent)), ['All locations', '30 Uniontown']);
+    await h.selectOption('#dcpick', '');
+    assert.equal(await h.textContent('#plant-name'), 'Uniontown');
+    assert.equal(await h.$eval('.hm-tile .hm-big', b => b.textContent), '9');
+    await h.selectOption('#dcpick', '30');
     assert.match(await h.textContent('#hm-changes'), /Route Menu brought in: Made Up Route Menu\.xlsb/);
     assert.match(await h.textContent('#hm-missing'), /No street address\s*8/);
     const hv = await page(browser, VIEWER);

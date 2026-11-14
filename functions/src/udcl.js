@@ -100,11 +100,13 @@ async function view(db, plant, person, opts) {
   const all = !!(opts && opts.all && r.importList);
   const groups = groupsOf(d);
   let inactive = 0;
-  if (!all) Object.keys(d.customers).forEach(k => { if (d.customers[k].inactive) { delete d.customers[k]; inactive++; } });
+  // Joe 11-14-26: Home picks a DC, so the inactive ones not shown are also counted by DC (no names, only how many).
+  const inactiveByDc = {};
+  if (!all) Object.keys(d.customers).forEach(k => { const c = d.customers[k]; if (c.inactive) { const b = U.branchOf(c.dc) || 'none'; inactiveByDc[b] = (inactiveByDc[b] || 0) + 1; delete d.customers[k]; inactive++; } });
   return { plant, plantName: plantName(plant), plants: L.plantsFor(person).filter(id => (L.PLANTS.find(p => p.id === id) || {}).status === 'ACTIVE').map(id => ({ id, name: plantName(id) })),
     customers: d.customers, routeDays: d.routeDays, imported: d.meta && d.meta.at ? { at: d.meta.at || '', by: d.meta.by || '', fileName: d.meta.fileName || '', counts: d.meta.counts || {} } : null,
     master: d.meta && d.meta.master ? d.meta.master : null, routeRule: d.meta && d.meta.routeRule ? d.meta.routeRule : null, addressSheet: d.meta && d.meta.addressSheet ? d.meta.addressSheet : null,
-    groups, inactiveHidden: inactive, canEdit: r.edit, canImport: r.importList, palletRules: U.palletRules(rules.exists ? rules.data() : null) };
+    groups, inactiveHidden: inactive, inactiveByDc, canEdit: r.edit, canImport: r.importList, palletRules: U.palletRules(rules.exists ? rules.data() : null) };
 }
 
 /*

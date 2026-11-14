@@ -37,14 +37,18 @@
         </div>
       </aside>
       <main class="hm-main">
-        <div class="head"><div class="title"><span class="eyebrow">United Dairy Customer List &middot; <span id="plant-name"></span></span><h1>Customer List</h1><small id="hm-asof"></small></div></div>
+        <div class="head"><div class="title"><span class="eyebrow">United Dairy Customer List &middot; <span id="plant-name"></span></span><h1>Customer List</h1><small id="hm-asof"></small></div>
+          <!-- Joe 11-14-26: "I should be able to choose my DC center". -->
+          <label class="hm-dc">Location <select id="dcpick" aria-label="Location (DC)"></select></label></div>
         <div id="home-body">
+          <section class="hm-card" id="hm-empty" hidden></section>
+          <div id="hm-full">
           <div class="hm-tiles" id="hm-tiles"></div>
           <div class="hm-grid">
-            <section class="hm-card hm-wide"><h2 id="hm-today-title"></h2><div id="hm-today"></div></section>
             <section class="hm-card"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/chart-column.svg);mask-image:url(img/icons/chart-column.svg)" aria-hidden="true"></span>The week</h2><div id="hm-week"></div></section>
             <section class="hm-card"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/list-checks.svg);mask-image:url(img/icons/list-checks.svg)" aria-hidden="true"></span>Missing on active customers</h2><div id="hm-missing"></div></section>
             <section class="hm-card hm-wide"><h2><span class="ico" style="-webkit-mask-image:url(img/icons/history.svg);mask-image:url(img/icons/history.svg)" aria-hidden="true"></span>Newest changes</h2><div id="hm-changes"></div></section>
+          </div>
           </div>
         </div>
       </main>
